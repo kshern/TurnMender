@@ -6,9 +6,6 @@ use thiserror::Error;
 #[cfg(target_os = "macos")]
 mod mac_desktop_ipc;
 
-pub const RETRY_MESSAGE: &str =
-    "Continue the previous task. First inspect the current workspace and review the work already completed to avoid repeating any actions, then resume from where it was interrupted.";
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendRequest {
     pub task_id: String,

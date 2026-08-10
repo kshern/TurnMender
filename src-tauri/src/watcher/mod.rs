@@ -1,7 +1,8 @@
 use crate::core::{
     classify_capacity, CapacityDecision, EventKey, LastAgentMessageState, PolicyState, TaskRegistry,
 };
-use crate::transport::RETRY_MESSAGE;
+#[cfg(test)]
+use crate::storage::DEFAULT_RETRY_MESSAGE;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -70,12 +71,18 @@ pub struct SessionWatcher {
     pending_keys: HashSet<EventKey>,
     task_names: HashMap<String, String>,
     task_project_paths: HashMap<String, String>,
+    retry_message: String,
     policy_dirty: bool,
     initial_cutoff: Option<f64>,
 }
 
 impl SessionWatcher {
+    #[cfg(test)]
     pub fn new(root: PathBuf, policy: PolicyState) -> Self {
+        Self::with_retry_message(root, policy, DEFAULT_RETRY_MESSAGE.to_string())
+    }
+
+    pub fn with_retry_message(root: PathBuf, policy: PolicyState, retry_message: String) -> Self {
         Self {
             root,
             registry: TaskRegistry::default(),
@@ -88,9 +95,14 @@ impl SessionWatcher {
             pending_keys: HashSet::new(),
             task_names: HashMap::new(),
             task_project_paths: HashMap::new(),
+            retry_message,
             policy_dirty: false,
             initial_cutoff: Some(now() - CATCH_UP.as_secs_f64()),
         }
+    }
+
+    pub fn set_retry_message(&mut self, retry_message: String) {
+        self.retry_message = retry_message;
     }
 
     pub fn poll(&mut self) -> io::Result<()> {
@@ -227,7 +239,8 @@ impl SessionWatcher {
             if line.len() > MAX_LINE_BYTES {
                 continue;
             }
-            if let Some(event) = parse_line(line, &task_id) {
+            if let Some(event) = parse_line_with_retry_message(line, &task_id, &self.retry_message)
+            {
                 self.handle(event);
             }
         }
@@ -268,6 +281,7 @@ impl SessionWatcher {
                 automatic,
                 at,
             } => {
+                let automatic = automatic || self.policy.is_automatic_turn(&turn_id);
                 if automatic {
                     self.note_automatic_turn(&task_id, &turn_id);
                 } else {
@@ -504,7 +518,16 @@ fn load_task_project_path(path: &Path) -> io::Result<Option<String>> {
     Ok(project_path)
 }
 
+#[cfg(test)]
 fn parse_line(line: &str, task_id: &str) -> Option<SessionEvent> {
+    parse_line_with_retry_message(line, task_id, DEFAULT_RETRY_MESSAGE)
+}
+
+fn parse_line_with_retry_message(
+    line: &str,
+    task_id: &str,
+    retry_message: &str,
+) -> Option<SessionEvent> {
     let record: Value = serde_json::from_str(line).ok()?;
     let record_type = record.get("type")?.as_str()?;
     let payload = record.get("payload")?;
@@ -587,7 +610,7 @@ fn parse_line(line: &str, task_id: &str) -> Option<SessionEvent> {
         return Some(SessionEvent::UserMessage {
             task_id: task_id.to_string(),
             turn_id,
-            automatic: text.trim() == RETRY_MESSAGE,
+            automatic: text.trim() == retry_message.trim(),
             at: timestamp,
         });
     }
@@ -766,6 +789,26 @@ mod tests {
         let snapshot = watcher.registry.snapshots().pop().unwrap();
         assert_eq!(snapshot.state, crate::core::TaskState::Running);
         assert_eq!(snapshot.latest_turn_id.as_deref(), Some("turn-1"));
+    }
+
+    #[test]
+    fn recognizes_a_custom_retry_message() {
+        let line = serde_json::to_string(&json!({
+            "type":"response_item",
+            "payload": {
+                "type":"message",
+                "role":"user",
+                "internal_chat_message_metadata_passthrough":{"turn_id":"turn-custom"},
+                "content":[{"type":"input_text", "text":"检查已有进度后继续任务。"}]
+            }
+        }))
+        .unwrap();
+
+        match parse_line_with_retry_message(&line, "task-1", "检查已有进度后继续任务。").unwrap()
+        {
+            SessionEvent::UserMessage { automatic, .. } => assert!(automatic),
+            _ => panic!("wrong event"),
+        }
     }
 
     #[test]

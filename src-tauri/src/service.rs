@@ -1,9 +1,10 @@
 use crate::core::{ChannelStatus, TaskSnapshot};
 use crate::storage::{
     append_log, load_config, load_policy, save_config, save_policy, ContinuationConfig, Paths,
-    MAX_AUTOMATIC_CHAIN_LIMIT, MIN_AUTOMATIC_CHAIN_LIMIT,
+    DEFAULT_RETRY_MESSAGE, MAX_AUTOMATIC_CHAIN_LIMIT, MAX_RETRY_MESSAGE_CHARS,
+    MIN_AUTOMATIC_CHAIN_LIMIT,
 };
-use crate::transport::{make_sender, SendRequest, Sender, RETRY_MESSAGE};
+use crate::transport::{make_sender, SendRequest, Sender};
 use crate::watcher::{default_session_root, FailureEvent, SessionWatcher};
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -65,6 +66,9 @@ pub struct ContinuationSnapshot {
     pub automatic_chain_limit: u32,
     pub automatic_chain_limit_min: u32,
     pub automatic_chain_limit_max: u32,
+    pub retry_message: String,
+    pub default_retry_message: String,
+    pub retry_message_max_chars: usize,
     pub platform: String,
     pub session_root: String,
     pub log_path: String,
@@ -77,6 +81,7 @@ struct Runtime {
     running: bool,
     auto_retry_enabled: bool,
     automatic_chain_limit: u32,
+    retry_message: String,
     status: ContinuationStatus,
     paths: Paths,
     watcher: SessionWatcher,
@@ -90,12 +95,18 @@ impl Runtime {
         let paths = Paths::discover(default_session_root());
         let policy = load_policy(&paths.state);
         let config = load_config(&paths.config);
+        let watcher = SessionWatcher::with_retry_message(
+            paths.session_root.clone(),
+            policy,
+            config.retry_message.clone(),
+        );
         Self {
             running: false,
             auto_retry_enabled: config.auto_retry_enabled,
             automatic_chain_limit: config.automatic_chain_limit,
+            retry_message: config.retry_message,
             status: ContinuationStatus::new(ContinuationStatusKind::Preparing),
-            watcher: SessionWatcher::new(paths.session_root.clone(), policy),
+            watcher,
             sender: make_sender(),
             paths,
             last_watch_error: None,
@@ -114,6 +125,9 @@ impl Runtime {
             automatic_chain_limit: self.automatic_chain_limit,
             automatic_chain_limit_min: MIN_AUTOMATIC_CHAIN_LIMIT,
             automatic_chain_limit_max: MAX_AUTOMATIC_CHAIN_LIMIT,
+            retry_message: self.retry_message.clone(),
+            default_retry_message: DEFAULT_RETRY_MESSAGE.to_string(),
+            retry_message_max_chars: MAX_RETRY_MESSAGE_CHARS,
             platform: std::env::consts::OS.to_string(),
             session_root: self.paths.session_root.display().to_string(),
             log_path: self.paths.log.display().to_string(),
@@ -193,7 +207,7 @@ impl Runtime {
         let request = SendRequest {
             task_id: event.key.task_id.clone(),
             failed_turn_id: event.key.turn_id.clone(),
-            message: RETRY_MESSAGE.to_string(),
+            message: self.retry_message.clone(),
         };
         match self.sender.send(&request) {
             Ok(receipt) if receipt.accepted && !receipt.new_turn_id.is_empty() => {
@@ -237,6 +251,14 @@ impl Runtime {
 
     fn log(&self, message: &str) {
         let _ = append_log(&self.paths.log, message);
+    }
+
+    fn config(&self) -> ContinuationConfig {
+        ContinuationConfig {
+            auto_retry_enabled: self.auto_retry_enabled,
+            automatic_chain_limit: self.automatic_chain_limit,
+            retry_message: self.retry_message.clone(),
+        }
     }
 
     fn persist_policy(&mut self) {
@@ -316,13 +338,7 @@ impl ContinuationService {
     pub fn set_auto_retry(&self, enabled: bool) {
         let mut runtime = self.runtime.lock();
         runtime.auto_retry_enabled = enabled;
-        if let Err(error) = save_config(
-            &runtime.paths.config,
-            &ContinuationConfig {
-                auto_retry_enabled: enabled,
-                automatic_chain_limit: runtime.automatic_chain_limit,
-            },
-        ) {
+        if let Err(error) = save_config(&runtime.paths.config, &runtime.config()) {
             runtime.log(&format!("无法保存自动继续设置：{error}"));
         }
     }
@@ -331,16 +347,46 @@ impl ContinuationService {
         let mut runtime = self.runtime.lock();
         let limit = limit.clamp(MIN_AUTOMATIC_CHAIN_LIMIT, MAX_AUTOMATIC_CHAIN_LIMIT);
         runtime.automatic_chain_limit = limit;
-        if let Err(error) = save_config(
-            &runtime.paths.config,
-            &ContinuationConfig {
-                auto_retry_enabled: runtime.auto_retry_enabled,
-                automatic_chain_limit: limit,
-            },
-        ) {
+        if let Err(error) = save_config(&runtime.paths.config, &runtime.config()) {
             runtime.log(&format!("无法保存连续自动继续上限：{error}"));
         }
         limit
+    }
+
+    pub fn set_continuation_settings(
+        &self,
+        automatic_chain_limit: u32,
+        retry_message: String,
+    ) -> Result<(), String> {
+        if !(MIN_AUTOMATIC_CHAIN_LIMIT..=MAX_AUTOMATIC_CHAIN_LIMIT).contains(&automatic_chain_limit)
+        {
+            return Err(format!(
+                "连续自动继续上限必须在 {MIN_AUTOMATIC_CHAIN_LIMIT} 到 {MAX_AUTOMATIC_CHAIN_LIMIT} 之间"
+            ));
+        }
+        let retry_message = retry_message.trim().to_string();
+        if retry_message.is_empty() {
+            return Err("继续指令不能为空".into());
+        }
+        if retry_message.chars().count() > MAX_RETRY_MESSAGE_CHARS {
+            return Err(format!("继续指令不能超过 {MAX_RETRY_MESSAGE_CHARS} 个字符"));
+        }
+
+        let mut runtime = self.runtime.lock();
+        let config = ContinuationConfig {
+            auto_retry_enabled: runtime.auto_retry_enabled,
+            automatic_chain_limit,
+            retry_message: retry_message.clone(),
+        };
+        if let Err(error) = save_config(&runtime.paths.config, &config) {
+            runtime.log(&format!("无法保存自动继续设置：{error}"));
+            return Err(format!("无法保存设置：{error}"));
+        }
+
+        runtime.automatic_chain_limit = automatic_chain_limit;
+        runtime.retry_message = retry_message.clone();
+        runtime.watcher.set_retry_message(retry_message);
+        Ok(())
     }
 
     pub fn dismiss_task(&self, task_id: &str) -> bool {

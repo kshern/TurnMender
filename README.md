@@ -27,8 +27,9 @@ Download the latest build from [GitHub Releases](https://github.com/kshern/TurnM
 - Shows the overall continuation status, recent tasks, task names, last activity times, and cases that require manual action.
 - Lets you pause or resume automatic continuation at any time while monitoring remains active.
 - Lets you set the consecutive automatic-continuation limit from 1 to 100 (10 by default).
+- Lets you customize the instruction sent to the original task and restore the default at any time.
 - Uses colored tray icons for healthy, attention, and action-required states.
-- Keeps running in the tray after the main window is closed, with options to reopen the window or quit completely.
+- Keeps running after the main window is closed; the tray menu shows status, toggles automatic continuation, opens tasks needing attention, provides Settings and log shortcuts, and can quit completely.
 - Persists deduplication records and consecutive continuation counts so the same error is not handled again after a restart.
 - Maintains a local runtime log that can be opened directly from the main window.
 
@@ -58,7 +59,7 @@ Additional safeguards prevent loops and accidental triggers:
 
 - Deduplication uses the task ID together with the failed turn ID.
 - A continuation counts as successful only after an acknowledgement containing a new turn ID is received.
-- When a task reaches the configured consecutive automatic-continuation limit, TurnMender switches to manual handling. The limit can be set from 1 to 100 in the main window and defaults to 10.
+- When a task reaches the configured consecutive automatic-continuation limit, TurnMender switches to manual handling. The limit can be set from 1 to 100 in Settings and defaults to 10.
 - A manually sent message clears the consecutive count for that task.
 - At startup, TurnMender checks only records updated within the last 10 minutes and does not process much older failures.
 - If sending fails, it does not fall back to command-line or UI automation.
@@ -73,7 +74,7 @@ The tray and main window use the same status colors:
 - Yellow: automatic continuation is paused, the messaging channel is not ready, or a task is waiting.
 - Red: monitoring failed, or a task requires manual review or continuation.
 
-Use **View Log** in the main window to open the log with the system default application. Closing the main window only hides it; use **Quit** from the tray menu to stop TurnMender completely.
+The tray menu explains the current state and includes a checked automatic-continuation toggle. When tasks need attention, it lists the three most recent tasks and opens the selected task directly in Codex; the main window contains the full list. Settings and the runtime log are also available from the tray. The window header keeps a second quick toggle, while the chain limit, continuation instruction, and interface language stay in Settings. Closing the main window only hides it; use **Quit TurnMender** from the tray menu to stop it completely.
 
 ## Local development
 
@@ -143,7 +144,7 @@ Application state, settings, and logs are stored in the TurnMender local data di
 | macOS | `~/Library/Application Support/TurnMender` |
 | Windows | `%LOCALAPPDATA%\TurnMender` |
 
-`state.json` stores deduplication data and consecutive counts, `config.json` stores the automatic-continuation switch and limit, and `turnmender.log` stores runtime logs.
+`state.json` stores deduplication data and consecutive counts, `config.json` stores the automatic-continuation switch, chain limit, and custom continuation instruction, and `turnmender.log` stores runtime logs.
 
 All decisions are made locally. State files do not store task bodies. Logs contain only task IDs, turn IDs, important automatic-continuation results, and errors. The main window and tray show the live monitoring state, so heartbeat entries are not periodically written to the log. Logs rotate after reaching 5 MB, keeping one older file with a `.1` suffix.
 

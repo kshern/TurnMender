@@ -8,6 +8,9 @@ const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
 pub const DEFAULT_AUTOMATIC_CHAIN_LIMIT: u32 = 10;
 pub const MIN_AUTOMATIC_CHAIN_LIMIT: u32 = 1;
 pub const MAX_AUTOMATIC_CHAIN_LIMIT: u32 = 100;
+pub const MAX_RETRY_MESSAGE_CHARS: usize = 4_000;
+pub const DEFAULT_RETRY_MESSAGE: &str =
+    "Continue the previous task. First inspect the current workspace and review the work already completed to avoid repeating any actions, then resume from where it was interrupted.";
 
 #[derive(Debug, Clone)]
 pub struct Paths {
@@ -38,6 +41,8 @@ pub struct ContinuationConfig {
     pub auto_retry_enabled: bool,
     #[serde(default = "default_automatic_chain_limit")]
     pub automatic_chain_limit: u32,
+    #[serde(default = "default_retry_message")]
+    pub retry_message: String,
 }
 
 impl Default for ContinuationConfig {
@@ -45,6 +50,7 @@ impl Default for ContinuationConfig {
         Self {
             auto_retry_enabled: default_auto_retry_enabled(),
             automatic_chain_limit: default_automatic_chain_limit(),
+            retry_message: default_retry_message(),
         }
     }
 }
@@ -54,6 +60,7 @@ impl ContinuationConfig {
         self.automatic_chain_limit = self
             .automatic_chain_limit
             .clamp(MIN_AUTOMATIC_CHAIN_LIMIT, MAX_AUTOMATIC_CHAIN_LIMIT);
+        self.retry_message = normalize_retry_message(&self.retry_message);
         self
     }
 }
@@ -64,6 +71,19 @@ fn default_auto_retry_enabled() -> bool {
 
 fn default_automatic_chain_limit() -> u32 {
     DEFAULT_AUTOMATIC_CHAIN_LIMIT
+}
+
+fn default_retry_message() -> String {
+    DEFAULT_RETRY_MESSAGE.to_string()
+}
+
+fn normalize_retry_message(message: &str) -> String {
+    let message = message.trim();
+    if message.is_empty() || message.chars().count() > MAX_RETRY_MESSAGE_CHARS {
+        DEFAULT_RETRY_MESSAGE.to_string()
+    } else {
+        message.to_string()
+    }
 }
 
 pub fn load_config(path: &PathBuf) -> ContinuationConfig {
@@ -228,6 +248,7 @@ mod tests {
 
         assert!(!config.auto_retry_enabled);
         assert_eq!(config.automatic_chain_limit, DEFAULT_AUTOMATIC_CHAIN_LIMIT);
+        assert_eq!(config.retry_message, DEFAULT_RETRY_MESSAGE);
         fs::remove_file(path).unwrap();
     }
 
@@ -240,12 +261,33 @@ mod tests {
         let config = ContinuationConfig {
             auto_retry_enabled: true,
             automatic_chain_limit: u32::MAX,
+            retry_message: "继续当前任务".into(),
         };
 
         save_config(&path, &config).unwrap();
         let loaded = load_config(&path);
 
         assert_eq!(loaded.automatic_chain_limit, MAX_AUTOMATIC_CHAIN_LIMIT);
+        assert_eq!(loaded.retry_message, "继续当前任务");
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn saves_and_loads_custom_retry_message() {
+        let path = std::env::temp_dir().join(format!(
+            "turnmender-config-message-test-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        let config = ContinuationConfig {
+            auto_retry_enabled: true,
+            automatic_chain_limit: DEFAULT_AUTOMATIC_CHAIN_LIMIT,
+            retry_message: "  检查已有进度后继续任务。  ".into(),
+        };
+
+        save_config(&path, &config).unwrap();
+        let loaded = load_config(&path);
+
+        assert_eq!(loaded.retry_message, "检查已有进度后继续任务。");
         fs::remove_file(path).unwrap();
     }
 }
