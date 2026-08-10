@@ -6,6 +6,7 @@ src-tauri/target/
 src-tauri/gen/
 node_modules/
 dist/
+output/
 
 # Local-only configuration
 .env

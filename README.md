@@ -1,98 +1,108 @@
-# TurnMender
+<p align="center">
+  <img src="assets/turnmender-logo.svg" alt="TurnMender logo" width="176" />
+</p>
 
-![TurnMender Logo](src-tauri/icons/icon.png)
+<h1 align="center">TurnMender</h1>
 
-TurnMender 是专为 Codex 桌面端设计的本地续行工具。它会监听所有 Codex 任务的本地记录；当某一轮明确因模型容量不足而停止，并且没有留下最终回复时，它会尝试在原任务中自动发起下一轮继续执行。
+<p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-它不需要 OpenAI API Key，不上传任务内容，也不会操作键盘、鼠标、剪贴板或窗口。TurnMender 是个人开发的非官方工具，与 OpenAI 没有关联。
+TurnMender is a local continuation helper built for Codex desktop. It watches the local records of every Codex task. When a turn clearly stops because the selected model is at capacity and no final response was produced, TurnMender attempts to start another turn in the original task so the work can continue.
 
-> TurnMender 使用 Tauri 2。macOS 已实现自动继续；Windows 目前只支持状态监听，尚未开放自动发送。
+It does not require an OpenAI API key, upload task content, or interact with the keyboard, mouse, clipboard, or windows. TurnMender is an independent, unofficial personal project and is not affiliated with OpenAI.
 
-## 主要功能
+> TurnMender is built with Tauri 2. Automatic continuation is available on macOS. Windows currently supports status monitoring only and does not send continuation messages.
 
-- 增量监听 `~/.codex/sessions` 下的全部 Codex 任务记录。
-- 只处理明确的模型容量错误，不干预普通失败。
-- 先确认失败轮次没有最终回复，再决定是否继续，避免重复打扰已经完成的任务。
-- 根据任务 ID 把继续消息发回原任务，不依赖当前窗口或任务标题猜测目标。
-- 显示整体续行状态、最近任务、任务名称、最后活动时间和需要人工处理的情况。
-- 可随时暂停或恢复自动继续；暂停后仍会保留监听。
-- 使用彩色托盘图标提示正常、需要留意和需要处理三种状态。
-- 主窗口关闭后继续在托盘运行，可通过托盘重新打开或彻底退出。
-- 保存去重记录和连续自动继续次数，应用重启后不会重复处理同一条错误。
-- 提供本地运行日志，并可在主界面中直接打开。
+## Download
 
-## 平台支持
+Download the latest build from [GitHub Releases](https://github.com/kshern/TurnMender/releases/latest). The current DMG is built for Apple Silicon Macs.
 
-| 平台 | 任务监听与界面 | 自动继续 | 当前说明 |
+## Features
+
+- Incrementally watches all Codex task records under `~/.codex/sessions`.
+- Handles only explicit model-capacity errors and leaves ordinary failures untouched.
+- Confirms that the failed turn has no final response before continuing, preventing duplicate messages after a task has already completed.
+- Sends the continuation message back to the original task by task ID instead of guessing from the active window or task title.
+- Shows the overall continuation status, recent tasks, task names, last activity times, and cases that require manual action.
+- Lets you pause or resume automatic continuation at any time while monitoring remains active.
+- Uses colored tray icons for healthy, attention, and action-required states.
+- Keeps running in the tray after the main window is closed, with options to reopen the window or quit completely.
+- Persists deduplication records and consecutive continuation counts so the same error is not handled again after a restart.
+- Maintains a local runtime log that can be opened directly from the main window.
+
+## Platform support
+
+| Platform | Monitoring and UI | Automatic continuation | Current status |
 | --- | --- | --- | --- |
-| macOS | 支持 | 支持 | 使用 Codex 桌面端的本地消息通道 |
-| Windows | 共用逻辑已实现，待实机验收 | 暂不支持 | 通道确认前只监听并提示人工继续 |
-| Linux / WSL2 | 未正式适配 | 暂不支持 | 不属于当前发布目标 |
+| macOS | Supported | Supported | Uses the local messaging channel provided by Codex desktop |
+| Windows | Shared logic implemented; hardware validation pending | Not yet supported | Monitors and asks for manual continuation until a suitable channel is confirmed |
+| Linux / WSL2 | Not officially supported | Not supported | Outside the current release targets |
 
-自动继续依赖 Codex 桌面端正在运行，并且本地消息通道可用。通道不存在、协议发生变化、找不到原任务或没有收到明确回执时，TurnMender 会停止自动处理该事件并提示人工继续。
+Automatic continuation requires Codex desktop to be running and its local messaging channel to be available. If the channel is missing, the protocol changes, the original task cannot be found, or no explicit acknowledgement is received, TurnMender stops automatic handling for that event and asks for manual continuation.
 
-## 判断规则
+## Decision rules
 
-TurnMender 只在读取到完整的 `task_complete` 记录后作出判断，不会根据生成中的文字提前操作。
+TurnMender makes a decision only after reading a complete `task_complete` record. It never acts on text that is still being generated.
 
-| 记录情况 | 处理方式 |
+| Record state | Action |
 | --- | --- |
-| 明确是容量错误，且 `last_agent_message` 为空 | 进入待继续；开关已开启且通道可用时自动继续 |
-| 明确是容量错误，但已经有最终回复 | 标记为已有回复，不发送消息 |
-| 明确是容量错误，但缺少判断所需字段 | 标记为需要确认，不自动发送 |
-| 普通网络、权限或业务错误 | 忽略，不干预 |
-| 错误后用户已经手动开始新一轮 | 取消旧事件，不再重复发送 |
+| Explicit capacity error with an empty `last_agent_message` | Marks the task as ready to continue; continues automatically when enabled and the channel is available |
+| Explicit capacity error with a final response | Marks the task as already answered and sends nothing |
+| Explicit capacity error missing required decision fields | Marks the task for review and sends nothing automatically |
+| Ordinary network, permission, or application error | Ignores the error |
+| The user manually starts another turn after the error | Cancels the old event and does not send a duplicate message |
 
-为避免循环和误触发，程序还会执行以下保护：
+Additional safeguards prevent loops and accidental triggers:
 
-- 使用“任务 ID + 失败轮次 ID”去重。
-- 只有收到包含新轮次 ID 的成功回执，才认为继续消息发送成功。
-- 同一任务连续自动继续达到 10 次后转为人工处理。
-- 用户手动发送新消息后，清空该任务的连续计数。
-- 启动时只补查最近 10 分钟内更新的任务记录，不扫描并处理很久以前的失败。
-- 发送失败时不会改用命令行或界面自动化再次尝试。
+- Deduplication uses the task ID together with the failed turn ID.
+- A continuation counts as successful only after an acknowledgement containing a new turn ID is received.
+- After 10 consecutive automatic continuations in the same task, TurnMender switches to manual handling.
+- A manually sent message clears the consecutive count for that task.
+- At startup, TurnMender checks only records updated within the last 10 minutes and does not process much older failures.
+- If sending fails, it does not fall back to command-line or UI automation.
 
-## 界面与托盘状态
+## Interface and tray states
 
-主界面每 3 秒刷新一次，最多展示最近 100 个已识别任务。任务可能显示为运行中、待继续、已有回复、空闲、需确认或通道不可用。任务可以从最近列表中手动移除；这不会删除 Codex 会话，有新活动时它会再次出现。
+The main window refreshes every three seconds and shows up to 100 recently recognized tasks. A task may appear as running, ready to continue, already answered, idle, requiring review, or channel unavailable. Removing a task from the recent list does not delete its Codex session; it will reappear when new activity occurs.
 
-托盘和主界面的颜色含义一致：
+The tray and main window use the same status colors:
 
-- 绿色：监听和消息通道正常，没有待处理异常。
-- 黄色：自动继续已暂停、消息通道未就绪，或有任务正在等待处理。
-- 红色：监听失败，或有任务需要人工确认、人工继续。
+- Green: monitoring and messaging are healthy, with no pending exceptions.
+- Yellow: automatic continuation is paused, the messaging channel is not ready, or a task is waiting.
+- Red: monitoring failed, or a task requires manual review or continuation.
 
-点击主界面的“查看日志”可以用系统默认应用打开日志文件。关闭主窗口只会隐藏窗口；如需完全退出，请使用托盘菜单中的“退出”。
+Use **View Log** in the main window to open the log with the system default application. Closing the main window only hides it; use **Quit** from the tray menu to stop TurnMender completely.
 
-## 本地运行
+## Local development
 
-### 准备环境
+### Prerequisites
 
-- Rust 1.77 或更高版本
-- Node.js 20 或更高版本
+- Rust 1.77.2 or later
+- Node.js 20 or later
 - pnpm 10
-- 对应平台的 Tauri 构建环境
+- The Tauri build prerequisites for your platform
 
-macOS 自动继续还需要 Codex 桌面端保持运行。
+Automatic continuation on macOS also requires Codex desktop to remain running.
 
-### 启动开发版
+### Run the development build
 
 ```sh
 pnpm install
 pnpm tauri dev
 ```
 
-自动继续默认开启。启动开发版后，如果发现符合条件的新容量错误，macOS 上可能会真实发送继续消息。调试时请先确认主界面中的开关状态。
+Automatic continuation is enabled by default. When a matching capacity error is found, the development build may send a real continuation message on macOS. Check the toggle in the main window before debugging.
 
-### 检查与测试
+### Checks and tests
 
-检查前端：
+Check the frontend:
 
 ```sh
 pnpm build
 ```
 
-测试并检查 Rust 后端：
+Test and check the Rust backend:
 
 ```sh
 cd src-tauri
@@ -100,86 +110,87 @@ cargo test --all-targets
 cargo check --all-targets
 ```
 
-### 构建安装包
+### Build an installer
 
-回到项目根目录后运行：
+From the project root:
 
 ```sh
 pnpm tauri build
 ```
 
-只构建调试可执行文件、不生成安装包：
+To build only a debug executable without an installer:
 
 ```sh
 pnpm tauri build --debug --no-bundle
 ```
 
-## 本地数据与隐私
+## Local data and privacy
 
-Codex 任务目录优先取自 `CODEX_HOME`。未设置时使用 `~/.codex`：
+The Codex task directory is resolved from `CODEX_HOME` when set, otherwise from `~/.codex`:
 
 ```text
-任务记录：~/.codex/sessions
-macOS 消息通道：~/.codex/ipc/ipc.sock
+Task records: ~/.codex/sessions
+macOS messaging channel: ~/.codex/ipc/ipc.sock
 ```
 
-如果设置了 `CODEX_HOME`，以上两个位置会相应变为 `$CODEX_HOME/sessions` 和 `$CODEX_HOME/ipc/ipc.sock`。
+When `CODEX_HOME` is set, these paths become `$CODEX_HOME/sessions` and `$CODEX_HOME/ipc/ipc.sock`.
 
-应用状态、设置和日志统一保存在 TurnMender 的本地数据目录：
+Application state, settings, and logs are stored in the TurnMender local data directory:
 
-| 平台 | 本地数据目录 |
+| Platform | Local data directory |
 | --- | --- |
 | macOS | `~/Library/Application Support/TurnMender` |
 | Windows | `%LOCALAPPDATA%\TurnMender` |
 
-目录中的 `state.json` 保存去重与连续计数，`config.json` 保存设置，`turnmender.log` 保存运行日志。
+`state.json` stores deduplication data and consecutive counts, `config.json` stores settings, and `turnmender.log` stores runtime logs.
 
-所有判断都在本机完成。状态文件不保存任务正文；日志只记录任务 ID、轮次 ID、关键自动继续结果和异常。
-正常监听状态以主界面和托盘为准，日志不会再周期性写入心跳记录。
-运行日志超过 5 MB 后会自动换成新文件，并保留一份 `.1` 结尾的旧日志，避免长期运行时无限增长。
+All decisions are made locally. State files do not store task bodies. Logs contain only task IDs, turn IDs, important automatic-continuation results, and errors. The main window and tray show the live monitoring state, so heartbeat entries are not periodically written to the log. Logs rotate after reaching 5 MB, keeping one older file with a `.1` suffix.
 
-## 安全边界
+## Security boundaries
 
-当前 Tauri 主版本明确不会：
+The current Tauri implementation explicitly does not:
 
-- 调用 `codex exec resume` 或启动其他 Codex CLI 子进程。
-- 申请 macOS 辅助功能权限。
-- 模拟键盘、鼠标、焦点、剪贴板或窗口操作。
-- 根据任务标题或当前前台窗口猜测发送目标。
-- 在本地消息通道失败后切换到其他发送方式。
-- 自动更换模型、账号，或处理容量不足以外的错误。
+- Run `codex exec resume` or start other Codex CLI subprocesses.
+- Request macOS Accessibility permission.
+- Simulate keyboard, mouse, focus, clipboard, or window actions.
+- Guess a target from the task title or active foreground window.
+- Switch to another sending method when the local messaging channel fails.
+- Automatically change the model or account, or handle errors other than model capacity.
 
-## 项目结构
+## Project structure
 
 ```text
 TurnMender/
+├── assets/
+│   └── turnmender-logo.svg         # Standalone transparent project logo
 ├── src/
-│   ├── main.ts                     # 主界面、状态刷新和交互
-│   ├── i18n.ts                     # 界面文案与语言切换
-│   └── styles.css                  # 界面样式
+│   ├── main.ts                     # Main UI, status refresh, and interactions
+│   ├── i18n.ts                     # UI copy and language switching
+│   └── styles.css                  # UI styles
 ├── src-tauri/
-│   ├── src/core/                   # 错误判断、任务状态和去重策略
-│   ├── src/watcher/                # JSONL 任务记录的增量监听
-│   ├── src/transport/              # 按任务 ID 发送继续消息
-│   ├── src/service.rs              # 续行流程和连续保护
-│   ├── src/storage.rs              # 设置、状态和日志
-│   └── tauri.conf.json             # 桌面应用与打包配置
-├── ARCHITECTURE.md                  # 当前架构与安全边界
-├── LICENSE                          # MIT 开源许可证
-└── README.md
+│   ├── src/core/                   # Error classification, task state, and deduplication policy
+│   ├── src/watcher/                # Incremental JSONL task-record watcher
+│   ├── src/transport/              # Sends continuation messages by task ID
+│   ├── src/service.rs              # Continuation workflow and consecutive-run protection
+│   ├── src/storage.rs              # Settings, state, and logs
+│   └── tauri.conf.json             # Desktop application and bundle configuration
+├── ARCHITECTURE.md                 # Architecture and security boundaries
+├── LICENSE                         # MIT License
+├── README.md                       # English documentation
+└── README.zh-CN.md                 # Simplified Chinese documentation
 ```
 
-## 当前限制
+## Current limitations
 
-- 依赖 Codex 当前的本地任务记录格式；格式变化后可能需要同步更新解析规则。
-- macOS 自动继续使用的是本地版本化通道，并非公开稳定接口；Codex 更新后可能暂时不可用。
-- Windows 尚未接入可以按任务 ID 定向发送并返回明确回执的本地通道。
-- 当前只处理模型容量不足，不会自动处理其他错误，也不会自动切换模型。
-- 启动时只补查最近 10 分钟的记录；更早的历史错误不会自动处理。
-- 当前仓库仍处于开发验证阶段，尚未提供正式签名的公开安装包。
+- TurnMender depends on the current Codex local task-record format. Parser updates may be required when that format changes.
+- Automatic continuation on macOS uses a local versioned channel rather than a public stable API. A Codex update may temporarily break compatibility.
+- Windows does not yet have a local channel that can target a task by ID and return an explicit acknowledgement.
+- Only model-capacity errors are handled. TurnMender does not process other errors or switch models automatically.
+- Startup recovery checks only the most recent 10 minutes; older historical errors are not processed automatically.
+- The project remains under active development and validation.
 
-更完整的设计背景和安全边界见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+See [ARCHITECTURE.md](ARCHITECTURE.md) for more details about the design and security boundaries.
 
-## 开源许可
+## License
 
-TurnMender 基于 [MIT License](LICENSE) 开源。你可以自由使用、修改和分发，但需要保留许可证中的版权和许可声明。
+TurnMender is available under the [MIT License](LICENSE). You may use, modify, and distribute it as long as the copyright and license notices are preserved.
