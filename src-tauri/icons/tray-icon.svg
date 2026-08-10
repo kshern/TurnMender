@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 20 20">
+  <mask id="shield-c" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+    <rect width="20" height="20" fill="black" />
+    <path
+      fill="white"
+      transform="translate(1 1) scale(0.03515625)"
+      d="M255.996 0C209.875 55.353 136.065 87.638 53.039 92.25V281.37C53.039 405.914 255.996 512 255.996 512S458.962 405.914 458.962 281.37V92.25C375.926 87.638 302.116 55.353 255.996 0Z"
+    />
+    <path
+      d="M12.6 7.8C12.1 6.3 7.9 6.3 7.4 7.8C6 9.2 6 10.8 7.4 12.2C7.9 13.7 12.1 13.7 12.6 12.2"
+      fill="none"
+      stroke="black"
+      stroke-width="1.85"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </mask>
+  <rect width="20" height="20" fill="black" mask="url(#shield-c)" />
+</svg>

@@ -1,0 +1,13 @@
+.DS_Store
+
+# Tauri / Rust / frontend build output
+target/
+src-tauri/target/
+src-tauri/gen/
+node_modules/
+dist/
+
+# Local-only configuration
+.env
+.env.*
+!.env.example
