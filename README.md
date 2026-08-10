@@ -1,12 +1,12 @@
-# CodexGuard
+# TurnMender
 
-![CodexGuard Logo](src-tauri/icons/icon.png)
+![TurnMender Logo](src-tauri/icons/icon.png)
 
-CodexGuard 是一个在本机运行的 Codex 桌面守护工具。它会监听所有 Codex 任务的本地记录；当某一轮明确因模型容量不足而停止，并且没有留下最终回复时，它会尝试在原任务中自动发起下一轮继续执行。
+TurnMender 是专为 Codex 桌面端设计的本地续行工具。它会监听所有 Codex 任务的本地记录；当某一轮明确因模型容量不足而停止，并且没有留下最终回复时，它会尝试在原任务中自动发起下一轮继续执行。
 
-它不需要 OpenAI API Key，不上传任务内容，也不会操作键盘、鼠标、剪贴板或窗口。CodexGuard 是个人开发的非官方工具，与 OpenAI 没有关联。
+它不需要 OpenAI API Key，不上传任务内容，也不会操作键盘、鼠标、剪贴板或窗口。TurnMender 是个人开发的非官方工具，与 OpenAI 没有关联。
 
-> CodexGuard 使用 Tauri 2。macOS 已实现自动继续；Windows 目前只支持状态监听，尚未开放自动发送。
+> TurnMender 使用 Tauri 2。macOS 已实现自动继续；Windows 目前只支持状态监听，尚未开放自动发送。
 
 ## 主要功能
 
@@ -14,7 +14,7 @@ CodexGuard 是一个在本机运行的 Codex 桌面守护工具。它会监听�
 - 只处理明确的模型容量错误，不干预普通失败。
 - 先确认失败轮次没有最终回复，再决定是否继续，避免重复打扰已经完成的任务。
 - 根据任务 ID 把继续消息发回原任务，不依赖当前窗口或任务标题猜测目标。
-- 显示整体守护状态、最近任务、任务名称、最后活动时间和需要人工处理的情况。
+- 显示整体续行状态、最近任务、任务名称、最后活动时间和需要人工处理的情况。
 - 可随时暂停或恢复自动继续；暂停后仍会保留监听。
 - 使用彩色托盘图标提示正常、需要留意和需要处理三种状态。
 - 主窗口关闭后继续在托盘运行，可通过托盘重新打开或彻底退出。
@@ -29,11 +29,11 @@ CodexGuard 是一个在本机运行的 Codex 桌面守护工具。它会监听�
 | Windows | 共用逻辑已实现，待实机验收 | 暂不支持 | 通道确认前只监听并提示人工继续 |
 | Linux / WSL2 | 未正式适配 | 暂不支持 | 不属于当前发布目标 |
 
-自动继续依赖 Codex 桌面端正在运行，并且本地消息通道可用。通道不存在、协议发生变化、找不到原任务或没有收到明确回执时，CodexGuard 会停止自动处理该事件并提示人工继续。
+自动继续依赖 Codex 桌面端正在运行，并且本地消息通道可用。通道不存在、协议发生变化、找不到原任务或没有收到明确回执时，TurnMender 会停止自动处理该事件并提示人工继续。
 
 ## 判断规则
 
-CodexGuard 只在读取到完整的 `task_complete` 记录后作出判断，不会根据生成中的文字提前操作。
+TurnMender 只在读取到完整的 `task_complete` 记录后作出判断，不会根据生成中的文字提前操作。
 
 | 记录情况 | 处理方式 |
 | --- | --- |
@@ -125,14 +125,14 @@ macOS 消息通道：~/.codex/ipc/ipc.sock
 
 如果设置了 `CODEX_HOME`，以上两个位置会相应变为 `$CODEX_HOME/sessions` 和 `$CODEX_HOME/ipc/ipc.sock`。
 
-应用状态、设置和日志统一保存在 CodexGuard 的本地数据目录：
+应用状态、设置和日志统一保存在 TurnMender 的本地数据目录：
 
 | 平台 | 本地数据目录 |
 | --- | --- |
-| macOS | `~/Library/Application Support/CodexGuard` |
-| Windows | `%LOCALAPPDATA%\CodexGuard` |
+| macOS | `~/Library/Application Support/TurnMender` |
+| Windows | `%LOCALAPPDATA%\TurnMender` |
 
-目录中的 `state.json` 保存去重与连续计数，`config.json` 保存设置，`codexguard.log` 保存运行日志。
+目录中的 `state.json` 保存去重与连续计数，`config.json` 保存设置，`turnmender.log` 保存运行日志。
 
 所有判断都在本机完成。状态文件不保存任务正文；日志只记录任务 ID、轮次 ID、关键自动继续结果和异常。
 正常监听状态以主界面和托盘为准，日志不会再周期性写入心跳记录。
@@ -152,7 +152,7 @@ macOS 消息通道：~/.codex/ipc/ipc.sock
 ## 项目结构
 
 ```text
-CodexGuard/
+TurnMender/
 ├── src/
 │   ├── main.ts                     # 主界面、状态刷新和交互
 │   ├── i18n.ts                     # 界面文案与语言切换
@@ -161,7 +161,7 @@ CodexGuard/
 │   ├── src/core/                   # 错误判断、任务状态和去重策略
 │   ├── src/watcher/                # JSONL 任务记录的增量监听
 │   ├── src/transport/              # 按任务 ID 发送继续消息
-│   ├── src/service.rs              # 守护流程和连续保护
+│   ├── src/service.rs              # 续行流程和连续保护
 │   ├── src/storage.rs              # 设置、状态和日志
 │   └── tauri.conf.json             # 桌面应用与打包配置
 ├── ARCHITECTURE.md                  # 当前架构与安全边界
@@ -182,4 +182,4 @@ CodexGuard/
 
 ## 开源许可
 
-CodexGuard 基于 [MIT License](LICENSE) 开源。你可以自由使用、修改和分发，但需要保留许可证中的版权和许可声明。
+TurnMender 基于 [MIT License](LICENSE) 开源。你可以自由使用、修改和分发，但需要保留许可证中的版权和许可声明。

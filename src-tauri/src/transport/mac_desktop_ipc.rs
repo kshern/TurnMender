@@ -92,7 +92,7 @@ impl Client {
         let response = client.request(
             "initialize",
             0,
-            json!({"clientType":"codex-guard"}),
+            json!({"clientType":"turnmender"}),
             None,
             DISCOVERY_TIMEOUT,
         )?;
@@ -264,13 +264,13 @@ mod tests {
     #[test]
     fn socket_status_is_safe_when_socket_missing() {
         let missing =
-            std::env::temp_dir().join(format!("codexguard-missing-socket-{}", Uuid::new_v4()));
+            std::env::temp_dir().join(format!("turnmender-missing-socket-{}", Uuid::new_v4()));
         assert!(MacDesktopIpc::verified_socket_at(&missing).is_none());
     }
 
     #[test]
     fn regular_file_is_not_accepted_as_socket() {
-        let root = std::env::temp_dir().join(format!("codexguard-fake-socket-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("turnmender-fake-socket-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
         let fake_socket = root.join("ipc.sock");
         fs::write(&fake_socket, b"not a socket").unwrap();

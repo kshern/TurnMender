@@ -1,6 +1,6 @@
-# CodexGuard 架构说明
+# TurnMender 架构说明
 
-CodexGuard 是一个 Tauri 2 桌面应用。前端负责展示和操作，Rust 后端负责读取 Codex 本地任务记录、判断是否需要继续、维护状态，并在 macOS 上通过本地消息通道发起下一轮。
+TurnMender 是一个专为 Codex 桌面端设计的 Tauri 2 应用。前端负责展示和操作，Rust 后端负责读取 Codex 本地任务记录、判断是否需要继续、维护状态，并在 macOS 上通过本地消息通道发起下一轮。
 
 ## 设计原则
 
@@ -108,15 +108,15 @@ classifier 判断错误类型和 last_agent_message
 
 ## 本地数据
 
-本地数据统一保存在平台的 CodexGuard 数据目录：
+本地数据统一保存在平台的 TurnMender 数据目录：
 
 | 文件 | 内容 |
 | --- | --- |
 | `state.json` | 已处理事件、自动轮次和连续计数 |
 | `config.json` | 自动继续开关 |
-| `codexguard.log` | 关键处理结果和异常 |
+| `turnmender.log` | 关键处理结果和异常 |
 
-macOS 目录是 `~/Library/Application Support/CodexGuard`，Windows 目录是 `%LOCALAPPDATA%\CodexGuard`。日志超过 5 MB 时轮换，并保留一个 `.1` 备份。
+macOS 目录是 `~/Library/Application Support/TurnMender`，Windows 目录是 `%LOCALAPPDATA%\TurnMender`。日志超过 5 MB 时轮换，并保留一个 `.1` 备份。
 
 状态和日志不保存任务正文。日志只记录任务 ID、轮次 ID、处理结果和必要的错误信息。
 

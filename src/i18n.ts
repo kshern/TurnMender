@@ -1,16 +1,16 @@
 export type Locale = "zh-CN" | "en";
 
-const STORAGE_KEY = "codexguard.locale";
+const STORAGE_KEY = "turnmender.locale";
 
 const zhCN = {
-  "meta.description": "CodexGuard 任务容量错误守护",
-  "brand.subtitle": "容量错误守护",
+  "meta.description": "TurnMender Codex 容量中断续行工具",
+  "brand.subtitle": "Codex 容量中断续行",
   "language.change": "切换语言",
   "language.chinese": "中文",
   "language.english": "English",
   "actions.viewLog": "显示日志",
   "actions.openFailed": "打开失败",
-  "loading.snapshot": "正在读取守护状态…",
+  "loading.snapshot": "正在读取续行状态…",
   "time.noActivity": "暂无活动",
   "task.unnamed": "未命名任务",
   "task.idTitle": "任务 ID：{id}",
@@ -40,14 +40,14 @@ const zhCN = {
   "health.actionRequired": "需要处理",
   "health.monitorOnly": "仅监听",
   "health.needsAttention": "需要留意",
-  "health.healthy": "守护正常",
-  "health.description.stopped": "守护已暂停，任务不会自动继续。",
+  "health.healthy": "续行就绪",
+  "health.description.stopped": "自动续行已暂停，任务不会自动继续。",
   "health.description.actionRequired": "检测到需要人工确认的任务或监听异常。",
   "health.description.monitorOnly": "监听仍在运行，但自动继续已暂停。",
   "health.description.channel": "监听仍在运行，但消息通道需要检查。",
   "health.description.waiting": "有任务正在等待后续处理。",
   "health.description.healthy": "发现容量错误后会自动继续。",
-  "overview.ariaLabel": "守护概览",
+  "overview.ariaLabel": "续行概览",
   "overview.currentStatus": "当前状态",
   "overview.tasks": "个任务",
   "overview.running": "运行中",
@@ -75,21 +75,21 @@ const zhCN = {
   "status.continuing": "正在继续「{task}」",
   "status.continued": "已继续「{task}」",
   "status.confirmSend": "「{task}」需要人工确认发送结果",
-  "status.stopped": "守卫已停止",
+  "status.stopped": "续行服务已停止",
   "status.unknown": "状态未知",
 } as const;
 
 type TranslationKey = keyof typeof zhCN;
 
 const en = {
-  "meta.description": "CodexGuard task capacity error guard",
-  "brand.subtitle": "Capacity error guard",
+  "meta.description": "TurnMender capacity continuation for Codex tasks",
+  "brand.subtitle": "Codex capacity continuation",
   "language.change": "Change language",
   "language.chinese": "中文",
   "language.english": "English",
   "actions.viewLog": "Show log",
   "actions.openFailed": "Could not open",
-  "loading.snapshot": "Reading guard status…",
+  "loading.snapshot": "Reading continuation status…",
   "time.noActivity": "No activity",
   "task.unnamed": "Unnamed task",
   "task.idTitle": "Task ID: {id}",
@@ -119,14 +119,14 @@ const en = {
   "health.actionRequired": "Action required",
   "health.monitorOnly": "Monitor only",
   "health.needsAttention": "Needs attention",
-  "health.healthy": "Guard healthy",
-  "health.description.stopped": "The guard is paused and will not continue tasks automatically.",
+  "health.healthy": "Continuation ready",
+  "health.description.stopped": "Automatic continuation is paused and tasks will not continue automatically.",
   "health.description.actionRequired": "A task or monitoring issue needs manual review.",
   "health.description.monitorOnly": "Monitoring is active, but automatic continuation is paused.",
   "health.description.channel": "Monitoring is active, but the messaging channel needs attention.",
   "health.description.waiting": "A task is waiting for follow-up handling.",
   "health.description.healthy": "Capacity errors will be continued automatically.",
-  "overview.ariaLabel": "Guard overview",
+  "overview.ariaLabel": "Continuation overview",
   "overview.currentStatus": "Current status",
   "overview.tasks": "tasks",
   "overview.running": "running",
@@ -154,7 +154,7 @@ const en = {
   "status.continuing": "Continuing “{task}”",
   "status.continued": "Continued “{task}”",
   "status.confirmSend": "“{task}” needs confirmation of the send result",
-  "status.stopped": "Guard stopped",
+  "status.stopped": "Continuation stopped",
   "status.unknown": "Status unknown",
 } satisfies Record<TranslationKey, string>;
 

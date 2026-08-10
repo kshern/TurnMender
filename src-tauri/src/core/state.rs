@@ -248,12 +248,12 @@ mod tests {
     fn project_path_is_included_in_snapshot() {
         let mut registry = TaskRegistry::default();
         registry.started("task-1", "turn-1", 10.0);
-        registry.set_project_path("task-1", "/Users/example/Workspace/CodexGuard");
+        registry.set_project_path("task-1", "/Users/example/Workspace/TurnMender");
 
         let snapshot = registry.snapshots().pop().unwrap();
         assert_eq!(
             snapshot.project_path.as_deref(),
-            Some("/Users/example/Workspace/CodexGuard")
+            Some("/Users/example/Workspace/TurnMender")
         );
     }
 

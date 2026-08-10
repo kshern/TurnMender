@@ -1,6 +1,6 @@
 use crate::core::{ChannelStatus, TaskSnapshot};
 use crate::storage::{
-    append_log, load_config, load_policy, save_config, save_policy, GuardConfig, Paths,
+    append_log, load_config, load_policy, save_config, save_policy, ContinuationConfig, Paths,
 };
 use crate::transport::{make_sender, SendRequest, Sender, RETRY_MESSAGE};
 use crate::watcher::{default_session_root, FailureEvent, SessionWatcher};
@@ -17,7 +17,7 @@ const MAX_AUTOMATIC_CHAIN: u32 = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GuardStatusKind {
+pub enum ContinuationStatusKind {
     Preparing,
     WatchFailed,
     Watching,
@@ -33,14 +33,14 @@ pub enum GuardStatusKind {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct GuardStatus {
-    pub kind: GuardStatusKind,
+pub struct ContinuationStatus {
+    pub kind: ContinuationStatusKind,
     pub task_name: Option<String>,
     pub detail: Option<String>,
 }
 
-impl GuardStatus {
-    fn new(kind: GuardStatusKind) -> Self {
+impl ContinuationStatus {
+    fn new(kind: ContinuationStatusKind) -> Self {
         Self {
             kind,
             task_name: None,
@@ -48,7 +48,7 @@ impl GuardStatus {
         }
     }
 
-    fn for_task(kind: GuardStatusKind, task_name: Option<&str>) -> Self {
+    fn for_task(kind: ContinuationStatusKind, task_name: Option<&str>) -> Self {
         Self {
             kind,
             task_name: compact_task_name(task_name),
@@ -58,7 +58,7 @@ impl GuardStatus {
 
     fn watch_failed(error: impl ToString) -> Self {
         Self {
-            kind: GuardStatusKind::WatchFailed,
+            kind: ContinuationStatusKind::WatchFailed,
             task_name: None,
             detail: Some(error.to_string()),
         }
@@ -66,29 +66,29 @@ impl GuardStatus {
 
     fn watching(channel_status: ChannelStatus) -> Self {
         match channel_status {
-            ChannelStatus::Ready => Self::new(GuardStatusKind::Watching),
-            ChannelStatus::Unsupported => Self::new(GuardStatusKind::WatchingUnsupported),
-            _ => Self::new(GuardStatusKind::WatchingChannelUnavailable),
+            ChannelStatus::Ready => Self::new(ContinuationStatusKind::Watching),
+            ChannelStatus::Unsupported => Self::new(ContinuationStatusKind::WatchingUnsupported),
+            _ => Self::new(ContinuationStatusKind::WatchingChannelUnavailable),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct GuardSnapshot {
+pub struct ContinuationSnapshot {
     pub running: bool,
     pub auto_retry_enabled: bool,
     pub platform: String,
     pub session_root: String,
     pub log_path: String,
     pub channel_status: ChannelStatus,
-    pub status: GuardStatus,
+    pub status: ContinuationStatus,
     pub tasks: Vec<TaskSnapshot>,
 }
 
 struct Runtime {
     running: bool,
     auto_retry_enabled: bool,
-    status: GuardStatus,
+    status: ContinuationStatus,
     paths: Paths,
     watcher: SessionWatcher,
     sender: Arc<dyn Sender>,
@@ -104,7 +104,7 @@ impl Runtime {
         Self {
             running: false,
             auto_retry_enabled: config.auto_retry_enabled,
-            status: GuardStatus::new(GuardStatusKind::Preparing),
+            status: ContinuationStatus::new(ContinuationStatusKind::Preparing),
             watcher: SessionWatcher::new(paths.session_root.clone(), policy),
             sender: make_sender(),
             paths,
@@ -113,12 +113,12 @@ impl Runtime {
         }
     }
 
-    fn snapshot(&self) -> GuardSnapshot {
+    fn snapshot(&self) -> ContinuationSnapshot {
         let mut tasks = self.watcher.registry.snapshots();
         for task in &mut tasks {
             task.continuation_count = self.watcher.policy.chain_failures(&task.task_id);
         }
-        GuardSnapshot {
+        ContinuationSnapshot {
             running: self.running,
             auto_retry_enabled: self.auto_retry_enabled,
             platform: std::env::consts::OS.to_string(),
@@ -133,7 +133,7 @@ impl Runtime {
     fn poll(&mut self) {
         if let Err(error) = self.watcher.poll() {
             let error = error.to_string();
-            self.status = GuardStatus::watch_failed(&error);
+            self.status = ContinuationStatus::watch_failed(&error);
             if self.last_watch_error.as_deref() != Some(error.as_str()) {
                 self.log(&format!("任务记录监听失败：{error}"));
             }
@@ -142,14 +142,14 @@ impl Runtime {
         }
         let channel_status = self.sender.status();
         if self.last_watch_error.take().is_some() {
-            self.status = GuardStatus::watching(channel_status);
+            self.status = ContinuationStatus::watching(channel_status);
             self.log("任务记录监听已恢复");
         }
         self.watcher.registry.set_all_channel_status(channel_status);
         let candidates = self.watcher.take_candidates();
         if candidates.is_empty() {
-            if self.running && self.status.kind == GuardStatusKind::Preparing {
-                self.status = GuardStatus::watching(channel_status);
+            if self.running && self.status.kind == ContinuationStatusKind::Preparing {
+                self.status = ContinuationStatus::watching(channel_status);
             }
             self.persist_policy();
             return;
@@ -164,7 +164,10 @@ impl Runtime {
         let task_name = compact_task_name(self.watcher.registry.task_name(&event.key.task_id));
         if !self.auto_retry_enabled {
             self.watcher.requeue(event);
-            self.status = GuardStatus::for_task(GuardStatusKind::TaskWaiting, task_name.as_deref());
+            self.status = ContinuationStatus::for_task(
+                ContinuationStatusKind::TaskWaiting,
+                task_name.as_deref(),
+            );
             return;
         }
         let chain = self.watcher.policy.chain_failures(&event.key.task_id);
@@ -175,8 +178,10 @@ impl Runtime {
                 &event.key.turn_id,
                 event.completed_at,
             );
-            self.status =
-                GuardStatus::for_task(GuardStatusKind::ChainProtected, task_name.as_deref());
+            self.status = ContinuationStatus::for_task(
+                ContinuationStatusKind::ChainProtected,
+                task_name.as_deref(),
+            );
             self.log(&format!(
                 "任务 {} 连续自动继续达到上限，转为人工处理",
                 event.key.task_id
@@ -190,8 +195,10 @@ impl Runtime {
                 &event.key.turn_id,
                 event.completed_at,
             );
-            self.status =
-                GuardStatus::for_task(GuardStatusKind::ManualContinue, task_name.as_deref());
+            self.status = ContinuationStatus::for_task(
+                ContinuationStatusKind::ManualContinue,
+                task_name.as_deref(),
+            );
             self.log(&format!(
                 "任务 {} 消息通道不可用，未切换到其他发送方式",
                 event.key.task_id
@@ -199,7 +206,8 @@ impl Runtime {
             return;
         }
 
-        self.status = GuardStatus::for_task(GuardStatusKind::Continuing, task_name.as_deref());
+        self.status =
+            ContinuationStatus::for_task(ContinuationStatusKind::Continuing, task_name.as_deref());
         let request = SendRequest {
             task_id: event.key.task_id.clone(),
             failed_turn_id: event.key.turn_id.clone(),
@@ -213,8 +221,10 @@ impl Runtime {
                 self.watcher
                     .registry
                     .sent(&event.key.task_id, &receipt.new_turn_id, now());
-                self.status =
-                    GuardStatus::for_task(GuardStatusKind::Continued, task_name.as_deref());
+                self.status = ContinuationStatus::for_task(
+                    ContinuationStatusKind::Continued,
+                    task_name.as_deref(),
+                );
                 self.log(&format!(
                     "任务 {} 自动继续成功：失败轮次 {}，新轮次 {}",
                     event.key.task_id, event.key.turn_id, receipt.new_turn_id
@@ -227,8 +237,10 @@ impl Runtime {
                     &event.key.turn_id,
                     event.completed_at,
                 );
-                self.status =
-                    GuardStatus::for_task(GuardStatusKind::ConfirmSend, task_name.as_deref());
+                self.status = ContinuationStatus::for_task(
+                    ContinuationStatusKind::ConfirmSend,
+                    task_name.as_deref(),
+                );
                 self.log(&format!(
                     "任务 {} 回执不完整，停止自动补发",
                     event.key.task_id
@@ -241,8 +253,10 @@ impl Runtime {
                     &event.key.turn_id,
                     event.completed_at,
                 );
-                self.status =
-                    GuardStatus::for_task(GuardStatusKind::ManualContinue, task_name.as_deref());
+                self.status = ContinuationStatus::for_task(
+                    ContinuationStatusKind::ManualContinue,
+                    task_name.as_deref(),
+                );
                 self.log(&format!("任务 {} 发送失败：{error}", event.key.task_id));
             }
         }
@@ -260,13 +274,13 @@ impl Runtime {
             Ok(()) => {
                 self.watcher.mark_policy_saved();
                 if self.last_policy_error.take().is_some() {
-                    self.log("守护状态保存已恢复");
+                    self.log("续行状态保存已恢复");
                 }
             }
             Err(error) => {
                 let error = error.to_string();
                 if self.last_policy_error.as_deref() != Some(error.as_str()) {
-                    self.log(&format!("无法保存守护状态：{error}"));
+                    self.log(&format!("无法保存续行状态：{error}"));
                 }
                 self.last_policy_error = Some(error);
             }
@@ -274,13 +288,13 @@ impl Runtime {
     }
 }
 
-pub struct GuardService {
+pub struct ContinuationService {
     runtime: Arc<Mutex<Runtime>>,
     stop: Arc<AtomicBool>,
     worker: Mutex<Option<JoinHandle<()>>>,
 }
 
-impl GuardService {
+impl ContinuationService {
     pub fn new() -> Self {
         Self {
             runtime: Arc::new(Mutex::new(Runtime::new())),
@@ -298,7 +312,7 @@ impl GuardService {
         {
             let mut runtime = self.runtime.lock();
             runtime.running = true;
-            runtime.status = GuardStatus::new(GuardStatusKind::Preparing);
+            runtime.status = ContinuationStatus::new(ContinuationStatusKind::Preparing);
         }
         let runtime = Arc::clone(&self.runtime);
         let stop = Arc::clone(&self.stop);
@@ -319,7 +333,7 @@ impl GuardService {
         {
             let mut runtime = self.runtime.lock();
             runtime.running = false;
-            runtime.status = GuardStatus::new(GuardStatusKind::Stopped);
+            runtime.status = ContinuationStatus::new(ContinuationStatusKind::Stopped);
         }
         if let Some(handle) = self.worker.lock().take() {
             let _ = handle.join();
@@ -331,7 +345,7 @@ impl GuardService {
         runtime.auto_retry_enabled = enabled;
         if let Err(error) = save_config(
             &runtime.paths.config,
-            &GuardConfig {
+            &ContinuationConfig {
                 auto_retry_enabled: enabled,
             },
         ) {
@@ -348,18 +362,18 @@ impl GuardService {
         runtime.watcher.registry.dismiss(task_id)
     }
 
-    pub fn snapshot(&self) -> GuardSnapshot {
+    pub fn snapshot(&self) -> ContinuationSnapshot {
         self.runtime.lock().snapshot()
     }
 }
 
-impl Default for GuardService {
+impl Default for ContinuationService {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for GuardService {
+impl Drop for ContinuationService {
     fn drop(&mut self) {
         self.stop();
     }

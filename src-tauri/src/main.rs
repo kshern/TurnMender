@@ -1,3 +1,3 @@
 fn main() {
-    codexguard_lib::run();
+    turnmender_lib::run();
 }

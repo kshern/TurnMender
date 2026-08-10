@@ -640,7 +640,7 @@ mod tests {
 
     fn temporary_sessions() -> PathBuf {
         let path =
-            std::env::temp_dir().join(format!("codexguard-watcher-test-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("turnmender-watcher-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&path).unwrap();
         path
     }
@@ -866,7 +866,7 @@ mod tests {
         let records = [
             json!({
                 "type":"session_meta",
-                "payload":{"id":task_id, "cwd":"/Users/example/Workspace/CodexGuard"}
+                "payload":{"id":task_id, "cwd":"/Users/example/Workspace/TurnMender"}
             }),
             json!({
                 "type":"event_msg",
@@ -887,7 +887,7 @@ mod tests {
         let snapshot = watcher.registry.snapshots().pop().unwrap();
         assert_eq!(
             snapshot.project_path.as_deref(),
-            Some("/Users/example/Workspace/CodexGuard")
+            Some("/Users/example/Workspace/TurnMender")
         );
 
         fs::remove_dir_all(root).unwrap();

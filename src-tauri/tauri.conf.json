@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CodexGuard",
+  "productName": "TurnMender",
   "version": "0.3.0",
-  "identifier": "com.kshern.codexguard",
+  "identifier": "com.kshern.turnmender",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -13,7 +13,8 @@
     "windows": [
       {
         "label": "main",
-        "title": "CodexGuard",
+        "title": "TurnMender",
+        "hiddenTitle": true,
         "width": 900,
         "height": 720,
         "minWidth": 700,
@@ -30,7 +31,7 @@
       "iconPath": "icons/tray-icon.png",
       "iconAsTemplate": false,
       "showMenuOnLeftClick": true,
-      "tooltip": "CodexGuard"
+      "tooltip": "TurnMender"
     }
   },
   "bundle": {

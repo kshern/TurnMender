@@ -1,13 +1,13 @@
 [package]
-name = "codexguard"
+name = "turnmender"
 version = "0.3.0"
-description = "Cross-platform Codex capacity error guard"
-authors = ["CodexGuard"]
+description = "Local capacity continuation for Codex tasks"
+authors = ["TurnMender"]
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "codexguard_lib"
+name = "turnmender_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

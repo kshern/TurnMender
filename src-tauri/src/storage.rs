@@ -19,23 +19,23 @@ impl Paths {
         let data_base = dirs::data_local_dir()
             .or_else(dirs::home_dir)
             .unwrap_or_else(|| PathBuf::from("."));
-        let data_root = data_base.join("CodexGuard");
+        let data_root = data_base.join("TurnMender");
         Self {
             state: data_root.join("state.json"),
             config: data_root.join("config.json"),
-            log: data_root.join("codexguard.log"),
+            log: data_root.join("turnmender.log"),
             session_root,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardConfig {
+pub struct ContinuationConfig {
     #[serde(default = "default_auto_retry_enabled")]
     pub auto_retry_enabled: bool,
 }
 
-impl Default for GuardConfig {
+impl Default for ContinuationConfig {
     fn default() -> Self {
         Self {
             auto_retry_enabled: default_auto_retry_enabled(),
@@ -47,14 +47,14 @@ fn default_auto_retry_enabled() -> bool {
     true
 }
 
-pub fn load_config(path: &PathBuf) -> GuardConfig {
+pub fn load_config(path: &PathBuf) -> ContinuationConfig {
     fs::read(path)
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default()
 }
 
-pub fn save_config(path: &PathBuf, config: &GuardConfig) -> io::Result<()> {
+pub fn save_config(path: &PathBuf, config: &ContinuationConfig) -> io::Result<()> {
     let bytes = serde_json::to_vec_pretty(config)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     atomic_write(path, &bytes)
@@ -134,15 +134,15 @@ mod tests {
     use crate::core::EventKey;
 
     fn temporary_test_directory(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("codexguard-{name}-{}", uuid::Uuid::new_v4()))
+        std::env::temp_dir().join(format!("turnmender-{name}-{}", uuid::Uuid::new_v4()))
     }
 
     #[test]
-    fn uses_codexguard_data_paths() {
+    fn uses_turnmender_data_paths() {
         let paths = Paths::discover(PathBuf::from("sessions"));
         assert_eq!(
             paths.state.parent().and_then(Path::file_name),
-            Some(std::ffi::OsStr::new("CodexGuard"))
+            Some(std::ffi::OsStr::new("TurnMender"))
         );
         assert_eq!(
             paths.config.file_name(),
@@ -150,7 +150,7 @@ mod tests {
         );
         assert_eq!(
             paths.log.file_name(),
-            Some(std::ffi::OsStr::new("codexguard.log"))
+            Some(std::ffi::OsStr::new("turnmender.log"))
         );
     }
 
@@ -158,14 +158,14 @@ mod tests {
     fn rotates_oversized_log_and_keeps_one_backup() {
         let directory = temporary_test_directory("log-rotation");
         fs::create_dir_all(&directory).unwrap();
-        let log = directory.join("guard.log");
+        let log = directory.join("turnmender.log");
         fs::write(&log, b"12345678").unwrap();
 
         rotate_log_if_needed(&log, 3, 10).unwrap();
 
         assert!(!log.exists());
         assert_eq!(
-            fs::read(directory.join("guard.log.1")).unwrap(),
+            fs::read(directory.join("turnmender.log.1")).unwrap(),
             b"12345678"
         );
         fs::remove_dir_all(directory).unwrap();
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn saves_and_loads_policy_state() {
         let path = std::env::temp_dir().join(format!(
-            "codexguard-state-test-{}.json",
+            "turnmender-state-test-{}.json",
             uuid::Uuid::new_v4()
         ));
         let mut policy = PolicyState::default();

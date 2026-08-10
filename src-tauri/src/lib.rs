@@ -7,7 +7,7 @@ pub mod core;
 
 use core::{ChannelStatus, TaskState};
 use parking_lot::Mutex;
-use service::{GuardService, GuardSnapshot, GuardStatusKind};
+use service::{ContinuationService, ContinuationSnapshot, ContinuationStatusKind};
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -21,7 +21,7 @@ use tauri::{
 use uuid::Uuid;
 
 pub struct AppState {
-    service: GuardService,
+    service: ContinuationService,
     locale: Mutex<AppLocale>,
 }
 
@@ -84,21 +84,21 @@ impl TrayTone {
 
     fn label(self, locale: AppLocale) -> &'static str {
         match (self, locale) {
-            (Self::Green, AppLocale::ZhCn) => "守护正常",
+            (Self::Green, AppLocale::ZhCn) => "续行就绪",
             (Self::Yellow, AppLocale::ZhCn) => "需要留意",
             (Self::Red, AppLocale::ZhCn) => "需要处理",
-            (Self::Green, AppLocale::En) => "Guard healthy",
+            (Self::Green, AppLocale::En) => "Continuation ready",
             (Self::Yellow, AppLocale::En) => "Needs attention",
             (Self::Red, AppLocale::En) => "Action required",
         }
     }
 }
 
-fn tray_tone(snapshot: &GuardSnapshot) -> TrayTone {
+fn tray_tone(snapshot: &ContinuationSnapshot) -> TrayTone {
     if !snapshot.running {
         return TrayTone::Red;
     }
-    if snapshot.status.kind == GuardStatusKind::WatchFailed
+    if snapshot.status.kind == ContinuationStatusKind::WatchFailed
         || snapshot
             .tasks
             .iter()
@@ -150,7 +150,7 @@ fn start_tray_status_sync(app: &tauri::AppHandle) {
                 if let Some(tray) = app_handle.tray_by_id("main") {
                     let _ = tray
                         .set_icon_with_as_template(Some(colored_tray_icon(tone.color())), false);
-                    let _ = tray.set_tooltip(Some(format!("CodexGuard · {}", tone.label(locale))));
+                    let _ = tray.set_tooltip(Some(format!("TurnMender · {}", tone.label(locale))));
                     current_status = Some((tone, locale));
                 }
             }
@@ -160,7 +160,7 @@ fn start_tray_status_sync(app: &tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn get_snapshot(state: State<'_, AppState>) -> GuardSnapshot {
+fn get_snapshot(state: State<'_, AppState>) -> ContinuationSnapshot {
     state.service.snapshot()
 }
 
@@ -186,7 +186,7 @@ fn set_locale(
     let snapshot = state.service.snapshot();
     if let Some(tray) = app.tray_by_id("main") {
         let tone = tray_tone(&snapshot);
-        tray.set_tooltip(Some(format!("CodexGuard · {}", tone.label(locale))))
+        tray.set_tooltip(Some(format!("TurnMender · {}", tone.label(locale))))
             .map_err(|error| error.to_string())?;
     }
     Ok(())
@@ -277,7 +277,7 @@ pub fn run() {
     let initial_locale = AppLocale::detect();
     tauri::Builder::default()
         .manage(AppState {
-            service: GuardService::new(),
+            service: ContinuationService::new(),
             locale: Mutex::new(initial_locale),
         })
         .invoke_handler(tauri::generate_handler![
@@ -319,7 +319,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running CodexGuard");
+        .expect("error while running TurnMender");
 }
 
 #[cfg(test)]

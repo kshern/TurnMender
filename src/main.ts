@@ -13,7 +13,7 @@ type TaskState =
 
 type ChannelStatus = "ready" | "unavailable" | "unsupported" | "unknown";
 type HealthTone = "green" | "yellow" | "red";
-type GuardStatusKind =
+type ContinuationStatusKind =
   | "preparing"
   | "watch_failed"
   | "watching"
@@ -27,8 +27,8 @@ type GuardStatusKind =
   | "confirm_send"
   | "stopped";
 
-interface GuardStatus {
-  kind: GuardStatusKind;
+interface ContinuationStatus {
+  kind: ContinuationStatusKind;
   task_name: string | null;
   detail: string | null;
 }
@@ -45,19 +45,19 @@ interface TaskSnapshot {
   channel_status: ChannelStatus;
 }
 
-interface GuardSnapshot {
+interface ContinuationSnapshot {
   running: boolean;
   auto_retry_enabled: boolean;
   platform: string;
   session_root: string;
   log_path: string;
   channel_status: ChannelStatus;
-  status: GuardStatus;
+  status: ContinuationStatus;
   tasks: TaskSnapshot[];
 }
 
 const state = {
-  snapshot: null as GuardSnapshot | null,
+  snapshot: null as ContinuationSnapshot | null,
   snapshotSignature: "",
   busy: false,
 };
@@ -158,7 +158,7 @@ function channelTone(value: ChannelStatus): HealthTone {
   return "red";
 }
 
-function healthTone(snapshot: GuardSnapshot): HealthTone {
+function healthTone(snapshot: ContinuationSnapshot): HealthTone {
   if (!snapshot.running) return "red";
   if (
     snapshot.status.kind === "watch_failed" ||
@@ -183,10 +183,10 @@ function taskDescription(task: TaskSnapshot): string {
   return t("task.description.lastActivity");
 }
 
-function statusText(status: GuardStatus): string {
+function statusText(status: ContinuationStatus): string {
   const task = status.task_name?.trim() || t("task.unnamed");
   const values = { task, detail: status.detail || t("status.unknown") };
-  const keys: Record<GuardStatusKind, Parameters<typeof t>[0]> = {
+  const keys: Record<ContinuationStatusKind, Parameters<typeof t>[0]> = {
     preparing: "status.preparing",
     watch_failed: "status.watchFailed",
     watching: "status.watching",
@@ -275,7 +275,7 @@ function render(): void {
         <div class="brand">
           <img class="brand-mark" src="${brandLogoUrl}" alt="" draggable="false" />
           <div>
-            <h1>CodexGuard</h1>
+            <h1>TurnMender</h1>
             <p>${t("brand.subtitle")}</p>
           </div>
         </div>
@@ -455,7 +455,7 @@ document.addEventListener("keydown", (event) => {
 
 async function loadSnapshot(): Promise<void> {
   try {
-    const snapshot = await invoke<GuardSnapshot>("get_snapshot");
+    const snapshot = await invoke<ContinuationSnapshot>("get_snapshot");
     const signature = JSON.stringify(snapshot);
     if (signature === state.snapshotSignature) return;
     state.snapshot = snapshot;
