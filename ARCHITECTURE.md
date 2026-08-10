@@ -90,7 +90,7 @@ classifier 判断错误类型和 last_agent_message
 
 - 使用“任务 ID + 失败轮次 ID”标识已处理事件。
 - 只有收到包含新轮次 ID 的成功回执，才记录为自动继续成功。
-- 同一任务连续自动继续最多 10 次，达到上限后转为人工处理。
+- 同一任务连续自动继续达到配置上限后转为人工处理；可配置范围为 1–100 次，默认 10 次。
 - 用户手动开始新一轮时，清空该任务的连续计数并取消旧候选事件。
 - 已处理事件和自动轮次会定期裁剪，避免状态文件无限增长。
 
@@ -113,7 +113,7 @@ classifier 判断错误类型和 last_agent_message
 | 文件 | 内容 |
 | --- | --- |
 | `state.json` | 已处理事件、自动轮次和连续计数 |
-| `config.json` | 自动继续开关 |
+| `config.json` | 自动继续开关和连续自动继续次数上限 |
 | `turnmender.log` | 关键处理结果和异常 |
 
 macOS 目录是 `~/Library/Application Support/TurnMender`，Windows 目录是 `%LOCALAPPDATA%\TurnMender`。日志超过 5 MB 时轮换，并保留一个 `.1` 备份。

@@ -170,6 +170,11 @@ fn set_auto_retry(enabled: bool, state: State<'_, AppState>) {
 }
 
 #[tauri::command]
+fn set_automatic_chain_limit(limit: u32, state: State<'_, AppState>) -> u32 {
+    state.service.set_automatic_chain_limit(limit)
+}
+
+#[tauri::command]
 fn dismiss_task(task_id: String, state: State<'_, AppState>) -> bool {
     state.service.dismiss_task(&task_id)
 }
@@ -283,6 +288,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
             set_auto_retry,
+            set_automatic_chain_limit,
             dismiss_task,
             set_locale,
             open_codex_thread,

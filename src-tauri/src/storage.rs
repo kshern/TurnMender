@@ -5,6 +5,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
+pub const DEFAULT_AUTOMATIC_CHAIN_LIMIT: u32 = 10;
+pub const MIN_AUTOMATIC_CHAIN_LIMIT: u32 = 1;
+pub const MAX_AUTOMATIC_CHAIN_LIMIT: u32 = 100;
 
 #[derive(Debug, Clone)]
 pub struct Paths {
@@ -33,13 +36,25 @@ impl Paths {
 pub struct ContinuationConfig {
     #[serde(default = "default_auto_retry_enabled")]
     pub auto_retry_enabled: bool,
+    #[serde(default = "default_automatic_chain_limit")]
+    pub automatic_chain_limit: u32,
 }
 
 impl Default for ContinuationConfig {
     fn default() -> Self {
         Self {
             auto_retry_enabled: default_auto_retry_enabled(),
+            automatic_chain_limit: default_automatic_chain_limit(),
         }
+    }
+}
+
+impl ContinuationConfig {
+    pub fn normalized(mut self) -> Self {
+        self.automatic_chain_limit = self
+            .automatic_chain_limit
+            .clamp(MIN_AUTOMATIC_CHAIN_LIMIT, MAX_AUTOMATIC_CHAIN_LIMIT);
+        self
     }
 }
 
@@ -47,15 +62,20 @@ fn default_auto_retry_enabled() -> bool {
     true
 }
 
+fn default_automatic_chain_limit() -> u32 {
+    DEFAULT_AUTOMATIC_CHAIN_LIMIT
+}
+
 pub fn load_config(path: &PathBuf) -> ContinuationConfig {
     fs::read(path)
         .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .and_then(|bytes| serde_json::from_slice::<ContinuationConfig>(&bytes).ok())
         .unwrap_or_default()
+        .normalized()
 }
 
 pub fn save_config(path: &PathBuf, config: &ContinuationConfig) -> io::Result<()> {
-    let bytes = serde_json::to_vec_pretty(config)
+    let bytes = serde_json::to_vec_pretty(&config.clone().normalized())
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     atomic_write(path, &bytes)
 }
@@ -193,6 +213,39 @@ mod tests {
         assert!(loaded.is_automatic_turn("turn-2"));
         assert_eq!(loaded.chain_failures("task-1"), 1);
 
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn loads_legacy_config_with_default_chain_limit() {
+        let path = std::env::temp_dir().join(format!(
+            "turnmender-config-test-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        fs::write(&path, br#"{"auto_retry_enabled":false}"#).unwrap();
+
+        let config = load_config(&path);
+
+        assert!(!config.auto_retry_enabled);
+        assert_eq!(config.automatic_chain_limit, DEFAULT_AUTOMATIC_CHAIN_LIMIT);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn normalizes_chain_limit_when_loading_and_saving_config() {
+        let path = std::env::temp_dir().join(format!(
+            "turnmender-config-limit-test-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        let config = ContinuationConfig {
+            auto_retry_enabled: true,
+            automatic_chain_limit: u32::MAX,
+        };
+
+        save_config(&path, &config).unwrap();
+        let loaded = load_config(&path);
+
+        assert_eq!(loaded.automatic_chain_limit, MAX_AUTOMATIC_CHAIN_LIMIT);
         fs::remove_file(path).unwrap();
     }
 }

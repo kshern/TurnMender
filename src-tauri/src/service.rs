@@ -1,6 +1,7 @@
 use crate::core::{ChannelStatus, TaskSnapshot};
 use crate::storage::{
     append_log, load_config, load_policy, save_config, save_policy, ContinuationConfig, Paths,
+    MAX_AUTOMATIC_CHAIN_LIMIT, MIN_AUTOMATIC_CHAIN_LIMIT,
 };
 use crate::transport::{make_sender, SendRequest, Sender, RETRY_MESSAGE};
 use crate::watcher::{default_session_root, FailureEvent, SessionWatcher};
@@ -12,8 +13,6 @@ use std::sync::{
 };
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-const MAX_AUTOMATIC_CHAIN: u32 = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -35,31 +34,17 @@ pub enum ContinuationStatusKind {
 #[derive(Debug, Clone, Serialize)]
 pub struct ContinuationStatus {
     pub kind: ContinuationStatusKind,
-    pub task_name: Option<String>,
     pub detail: Option<String>,
 }
 
 impl ContinuationStatus {
     fn new(kind: ContinuationStatusKind) -> Self {
-        Self {
-            kind,
-            task_name: None,
-            detail: None,
-        }
-    }
-
-    fn for_task(kind: ContinuationStatusKind, task_name: Option<&str>) -> Self {
-        Self {
-            kind,
-            task_name: compact_task_name(task_name),
-            detail: None,
-        }
+        Self { kind, detail: None }
     }
 
     fn watch_failed(error: impl ToString) -> Self {
         Self {
             kind: ContinuationStatusKind::WatchFailed,
-            task_name: None,
             detail: Some(error.to_string()),
         }
     }
@@ -77,6 +62,9 @@ impl ContinuationStatus {
 pub struct ContinuationSnapshot {
     pub running: bool,
     pub auto_retry_enabled: bool,
+    pub automatic_chain_limit: u32,
+    pub automatic_chain_limit_min: u32,
+    pub automatic_chain_limit_max: u32,
     pub platform: String,
     pub session_root: String,
     pub log_path: String,
@@ -88,6 +76,7 @@ pub struct ContinuationSnapshot {
 struct Runtime {
     running: bool,
     auto_retry_enabled: bool,
+    automatic_chain_limit: u32,
     status: ContinuationStatus,
     paths: Paths,
     watcher: SessionWatcher,
@@ -104,6 +93,7 @@ impl Runtime {
         Self {
             running: false,
             auto_retry_enabled: config.auto_retry_enabled,
+            automatic_chain_limit: config.automatic_chain_limit,
             status: ContinuationStatus::new(ContinuationStatusKind::Preparing),
             watcher: SessionWatcher::new(paths.session_root.clone(), policy),
             sender: make_sender(),
@@ -121,6 +111,9 @@ impl Runtime {
         ContinuationSnapshot {
             running: self.running,
             auto_retry_enabled: self.auto_retry_enabled,
+            automatic_chain_limit: self.automatic_chain_limit,
+            automatic_chain_limit_min: MIN_AUTOMATIC_CHAIN_LIMIT,
+            automatic_chain_limit_max: MAX_AUTOMATIC_CHAIN_LIMIT,
             platform: std::env::consts::OS.to_string(),
             session_root: self.paths.session_root.display().to_string(),
             log_path: self.paths.log.display().to_string(),
@@ -161,30 +154,23 @@ impl Runtime {
     }
 
     fn process_candidate(&mut self, event: FailureEvent, channel_status: ChannelStatus) {
-        let task_name = compact_task_name(self.watcher.registry.task_name(&event.key.task_id));
         if !self.auto_retry_enabled {
             self.watcher.requeue(event);
-            self.status = ContinuationStatus::for_task(
-                ContinuationStatusKind::TaskWaiting,
-                task_name.as_deref(),
-            );
+            self.status = ContinuationStatus::new(ContinuationStatusKind::TaskWaiting);
             return;
         }
         let chain = self.watcher.policy.chain_failures(&event.key.task_id);
-        if chain >= MAX_AUTOMATIC_CHAIN {
+        if chain >= self.automatic_chain_limit {
             self.watcher.mark_manual(&event);
             self.watcher.registry.unknown(
                 &event.key.task_id,
                 &event.key.turn_id,
                 event.completed_at,
             );
-            self.status = ContinuationStatus::for_task(
-                ContinuationStatusKind::ChainProtected,
-                task_name.as_deref(),
-            );
+            self.status = ContinuationStatus::new(ContinuationStatusKind::ChainProtected);
             self.log(&format!(
-                "任务 {} 连续自动继续达到上限，转为人工处理",
-                event.key.task_id
+                "任务 {} 连续自动继续达到上限（{} 次），转为人工处理",
+                event.key.task_id, self.automatic_chain_limit
             ));
             return;
         }
@@ -195,10 +181,7 @@ impl Runtime {
                 &event.key.turn_id,
                 event.completed_at,
             );
-            self.status = ContinuationStatus::for_task(
-                ContinuationStatusKind::ManualContinue,
-                task_name.as_deref(),
-            );
+            self.status = ContinuationStatus::new(ContinuationStatusKind::ManualContinue);
             self.log(&format!(
                 "任务 {} 消息通道不可用，未切换到其他发送方式",
                 event.key.task_id
@@ -206,8 +189,7 @@ impl Runtime {
             return;
         }
 
-        self.status =
-            ContinuationStatus::for_task(ContinuationStatusKind::Continuing, task_name.as_deref());
+        self.status = ContinuationStatus::new(ContinuationStatusKind::Continuing);
         let request = SendRequest {
             task_id: event.key.task_id.clone(),
             failed_turn_id: event.key.turn_id.clone(),
@@ -221,10 +203,7 @@ impl Runtime {
                 self.watcher
                     .registry
                     .sent(&event.key.task_id, &receipt.new_turn_id, now());
-                self.status = ContinuationStatus::for_task(
-                    ContinuationStatusKind::Continued,
-                    task_name.as_deref(),
-                );
+                self.status = ContinuationStatus::new(ContinuationStatusKind::Continued);
                 self.log(&format!(
                     "任务 {} 自动继续成功：失败轮次 {}，新轮次 {}",
                     event.key.task_id, event.key.turn_id, receipt.new_turn_id
@@ -237,10 +216,7 @@ impl Runtime {
                     &event.key.turn_id,
                     event.completed_at,
                 );
-                self.status = ContinuationStatus::for_task(
-                    ContinuationStatusKind::ConfirmSend,
-                    task_name.as_deref(),
-                );
+                self.status = ContinuationStatus::new(ContinuationStatusKind::ConfirmSend);
                 self.log(&format!(
                     "任务 {} 回执不完整，停止自动补发",
                     event.key.task_id
@@ -253,10 +229,7 @@ impl Runtime {
                     &event.key.turn_id,
                     event.completed_at,
                 );
-                self.status = ContinuationStatus::for_task(
-                    ContinuationStatusKind::ManualContinue,
-                    task_name.as_deref(),
-                );
+                self.status = ContinuationStatus::new(ContinuationStatusKind::ManualContinue);
                 self.log(&format!("任务 {} 发送失败：{error}", event.key.task_id));
             }
         }
@@ -347,10 +320,27 @@ impl ContinuationService {
             &runtime.paths.config,
             &ContinuationConfig {
                 auto_retry_enabled: enabled,
+                automatic_chain_limit: runtime.automatic_chain_limit,
             },
         ) {
             runtime.log(&format!("无法保存自动继续设置：{error}"));
         }
+    }
+
+    pub fn set_automatic_chain_limit(&self, limit: u32) -> u32 {
+        let mut runtime = self.runtime.lock();
+        let limit = limit.clamp(MIN_AUTOMATIC_CHAIN_LIMIT, MAX_AUTOMATIC_CHAIN_LIMIT);
+        runtime.automatic_chain_limit = limit;
+        if let Err(error) = save_config(
+            &runtime.paths.config,
+            &ContinuationConfig {
+                auto_retry_enabled: runtime.auto_retry_enabled,
+                automatic_chain_limit: limit,
+            },
+        ) {
+            runtime.log(&format!("无法保存连续自动继续上限：{error}"));
+        }
+        limit
     }
 
     pub fn dismiss_task(&self, task_id: &str) -> bool {
@@ -377,19 +367,6 @@ impl Drop for ContinuationService {
     fn drop(&mut self) {
         self.stop();
     }
-}
-
-fn compact_task_name(task_name: Option<&str>) -> Option<String> {
-    let task_name = task_name?.trim();
-    if task_name.is_empty() {
-        return None;
-    }
-    let mut characters = task_name.chars();
-    let mut compact: String = characters.by_ref().take(24).collect();
-    if characters.next().is_some() {
-        compact.push('…');
-    }
-    Some(compact)
 }
 
 fn now() -> f64 {

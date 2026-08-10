@@ -29,7 +29,6 @@ type ContinuationStatusKind =
 
 interface ContinuationStatus {
   kind: ContinuationStatusKind;
-  task_name: string | null;
   detail: string | null;
 }
 
@@ -48,6 +47,9 @@ interface TaskSnapshot {
 interface ContinuationSnapshot {
   running: boolean;
   auto_retry_enabled: boolean;
+  automatic_chain_limit: number;
+  automatic_chain_limit_min: number;
+  automatic_chain_limit_max: number;
   platform: string;
   session_root: string;
   log_path: string;
@@ -183,9 +185,13 @@ function taskDescription(task: TaskSnapshot): string {
   return t("task.description.lastActivity");
 }
 
-function statusText(status: ContinuationStatus): string {
-  const task = status.task_name?.trim() || t("task.unnamed");
-  const values = { task, detail: status.detail || t("status.unknown") };
+function statusText(status: ContinuationStatus, automaticChainLimit: number): string {
+  // The overview card is intentionally global. Task names belong in the
+  // recent-task list, so a session title must never become the headline here.
+  const values = {
+    detail: status.detail || t("status.unknown"),
+    limit: automaticChainLimit,
+  };
   const keys: Record<ContinuationStatusKind, Parameters<typeof t>[0]> = {
     preparing: "status.preparing",
     watch_failed: "status.watchFailed",
@@ -268,6 +274,11 @@ function render(): void {
   const currentLocale = getLocale();
   const languageAria = escapeHTML(t("language.change"));
   const logLabel = escapeHTML(t("actions.viewLog"));
+  const limitAria = escapeHTML(t("retry.limitAria", {
+    min: snapshot.automatic_chain_limit_min,
+    max: snapshot.automatic_chain_limit_max,
+  }));
+  const limitTitle = escapeHTML(t("retry.limitTitle"));
 
   app.innerHTML = `
     <main class="shell">
@@ -288,6 +299,11 @@ function render(): void {
             </div>
           </div>
           <button id="view-log" class="log-button" type="button" aria-label="${logLabel}" data-tooltip="${logLabel}">${icon("file")}</button>
+          <label class="top-limit-control" title="${limitTitle}">
+            <span class="limit-label">${t("retry.limitLabel")}</span>
+            <input id="automatic-chain-limit" class="limit-input" type="number" min="${snapshot.automatic_chain_limit_min}" max="${snapshot.automatic_chain_limit_max}" step="1" value="${snapshot.automatic_chain_limit}" inputmode="numeric" aria-label="${limitAria}" ${state.busy ? "disabled" : ""} />
+            <span class="limit-unit">${t("retry.limitUnit")}</span>
+          </label>
           <div class="top-retry-control ${snapshot.auto_retry_enabled ? "on" : "off"}">
             <span class="retry-state">${snapshot.auto_retry_enabled ? t("retry.on") : t("retry.off")}</span>
             <button id="auto-retry" class="toggle-switch ${snapshot.auto_retry_enabled ? "on" : "off"}" type="button" aria-label="${snapshot.auto_retry_enabled ? t("retry.disableAria") : t("retry.enableAria")}" aria-pressed="${snapshot.auto_retry_enabled}" ${state.busy ? "disabled" : ""}>
@@ -302,7 +318,7 @@ function render(): void {
           <div class="overview-heading">
             <span class="overview-kicker"><span class="pulse-mark"></span>${t("overview.currentStatus")}</span>
           </div>
-          <h2>${escapeHTML(statusText(snapshot.status))}</h2>
+          <h2>${escapeHTML(statusText(snapshot.status, snapshot.automatic_chain_limit))}</h2>
           <div class="current-card-footer">
             <div><strong>${snapshot.tasks.length}</strong><span>${t("overview.tasks")}</span></div>
             <span class="footer-divider"></span>
@@ -340,6 +356,47 @@ function render(): void {
       state.busy = false;
       const toggle = document.querySelector<HTMLButtonElement>("#auto-retry");
       if (toggle) toggle.disabled = false;
+    }
+  });
+
+  const automaticChainLimit = document.querySelector<HTMLInputElement>("#automatic-chain-limit");
+  const saveAutomaticChainLimit = async (): Promise<void> => {
+    if (!automaticChainLimit) return;
+    const requestedLimit = Number(automaticChainLimit.value);
+    const valid =
+      Number.isInteger(requestedLimit) &&
+      requestedLimit >= snapshot.automatic_chain_limit_min &&
+      requestedLimit <= snapshot.automatic_chain_limit_max;
+    if (!valid) {
+      automaticChainLimit.value = String(snapshot.automatic_chain_limit);
+      return;
+    }
+    if (requestedLimit === snapshot.automatic_chain_limit) return;
+
+    state.busy = true;
+    automaticChainLimit.disabled = true;
+    try {
+      await invoke<number>("set_automatic_chain_limit", { limit: requestedLimit });
+      await loadSnapshot();
+    } catch (error) {
+      console.error(error);
+      if (automaticChainLimit.isConnected) {
+        automaticChainLimit.value = String(snapshot.automatic_chain_limit);
+      }
+    } finally {
+      state.busy = false;
+      const input = document.querySelector<HTMLInputElement>("#automatic-chain-limit");
+      if (input) input.disabled = false;
+    }
+  };
+  automaticChainLimit?.addEventListener("change", () => void saveAutomaticChainLimit());
+  automaticChainLimit?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      automaticChainLimit.blur();
+    } else if (event.key === "Escape") {
+      automaticChainLimit.value = String(snapshot.automatic_chain_limit);
+      automaticChainLimit.blur();
     }
   });
 

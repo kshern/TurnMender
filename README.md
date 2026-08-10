@@ -26,6 +26,7 @@ Download the latest build from [GitHub Releases](https://github.com/kshern/TurnM
 - Sends the continuation message back to the original task by task ID instead of guessing from the active window or task title.
 - Shows the overall continuation status, recent tasks, task names, last activity times, and cases that require manual action.
 - Lets you pause or resume automatic continuation at any time while monitoring remains active.
+- Lets you set the consecutive automatic-continuation limit from 1 to 100 (10 by default).
 - Uses colored tray icons for healthy, attention, and action-required states.
 - Keeps running in the tray after the main window is closed, with options to reopen the window or quit completely.
 - Persists deduplication records and consecutive continuation counts so the same error is not handled again after a restart.
@@ -57,7 +58,7 @@ Additional safeguards prevent loops and accidental triggers:
 
 - Deduplication uses the task ID together with the failed turn ID.
 - A continuation counts as successful only after an acknowledgement containing a new turn ID is received.
-- After 10 consecutive automatic continuations in the same task, TurnMender switches to manual handling.
+- When a task reaches the configured consecutive automatic-continuation limit, TurnMender switches to manual handling. The limit can be set from 1 to 100 in the main window and defaults to 10.
 - A manually sent message clears the consecutive count for that task.
 - At startup, TurnMender checks only records updated within the last 10 minutes and does not process much older failures.
 - If sending fails, it does not fall back to command-line or UI automation.
@@ -142,7 +143,7 @@ Application state, settings, and logs are stored in the TurnMender local data di
 | macOS | `~/Library/Application Support/TurnMender` |
 | Windows | `%LOCALAPPDATA%\TurnMender` |
 
-`state.json` stores deduplication data and consecutive counts, `config.json` stores settings, and `turnmender.log` stores runtime logs.
+`state.json` stores deduplication data and consecutive counts, `config.json` stores the automatic-continuation switch and limit, and `turnmender.log` stores runtime logs.
 
 All decisions are made locally. State files do not store task bodies. Logs contain only task IDs, turn IDs, important automatic-continuation results, and errors. The main window and tray show the live monitoring state, so heartbeat entries are not periodically written to the log. Logs rotate after reaching 5 MB, keeping one older file with a `.1` suffix.
 
