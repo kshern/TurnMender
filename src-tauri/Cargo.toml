@@ -1,6 +1,6 @@
 [package]
 name = "turnmender"
-version = "1.0.1"
+version = "1.0.2"
 description = "Local capacity continuation for Codex tasks"
 authors = ["TurnMender"]
 edition = "2021"
