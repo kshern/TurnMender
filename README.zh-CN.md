@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/turnmender-logo.svg" alt="TurnMender Logo" width="176" />
+  <img src="assets/turnmender-logo.png" alt="TurnMender Logo" width="176" />
 </p>
 
 <h1 align="center">TurnMender</h1>
@@ -171,7 +171,7 @@ macOS 消息通道：~/.codex/ipc/ipc.sock
 ```text
 TurnMender/
 ├── assets/
-│   └── turnmender-logo.svg         # 透明背景的项目纯 Logo
+│   └── turnmender-logo.png         # 透明背景的项目纯 Logo
 ├── src/
 │   ├── main.ts                     # 主界面、状态刷新和交互
 │   ├── i18n.ts                     # 界面文案与语言切换

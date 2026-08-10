@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/turnmender-logo.svg" alt="TurnMender logo" width="176" />
+  <img src="assets/turnmender-logo.png" alt="TurnMender logo" width="176" />
 </p>
 
 <h1 align="center">TurnMender</h1>
@@ -162,7 +162,7 @@ The current Tauri implementation explicitly does not:
 ```text
 TurnMender/
 ├── assets/
-│   └── turnmender-logo.svg         # Standalone transparent project logo
+│   └── turnmender-logo.png         # Standalone transparent project logo
 ├── src/
 │   ├── main.ts                     # Main UI, status refresh, and interactions
 │   ├── i18n.ts                     # UI copy and language switching
