@@ -1,8 +1,7 @@
 use crate::core::{ChannelStatus, TaskSnapshot};
 use crate::storage::{
     append_log, load_config, load_policy, save_config, save_policy, ContinuationConfig, Paths,
-    DEFAULT_RETRY_MESSAGE, MAX_AUTOMATIC_CHAIN_LIMIT, MAX_RETRY_MESSAGE_CHARS,
-    MIN_AUTOMATIC_CHAIN_LIMIT,
+    DEFAULT_RETRY_MESSAGE, MAX_RETRY_MESSAGE_CHARS, MIN_AUTOMATIC_CHAIN_LIMIT,
 };
 use crate::transport::{make_sender, SendRequest, Sender};
 use crate::watcher::{default_session_root, FailureEvent, SessionWatcher};
@@ -65,7 +64,6 @@ pub struct ContinuationSnapshot {
     pub auto_retry_enabled: bool,
     pub automatic_chain_limit: u32,
     pub automatic_chain_limit_min: u32,
-    pub automatic_chain_limit_max: u32,
     pub retry_message: String,
     pub default_retry_message: String,
     pub retry_message_max_chars: usize,
@@ -124,7 +122,6 @@ impl Runtime {
             auto_retry_enabled: self.auto_retry_enabled,
             automatic_chain_limit: self.automatic_chain_limit,
             automatic_chain_limit_min: MIN_AUTOMATIC_CHAIN_LIMIT,
-            automatic_chain_limit_max: MAX_AUTOMATIC_CHAIN_LIMIT,
             retry_message: self.retry_message.clone(),
             default_retry_message: DEFAULT_RETRY_MESSAGE.to_string(),
             retry_message_max_chars: MAX_RETRY_MESSAGE_CHARS,
@@ -345,7 +342,7 @@ impl ContinuationService {
 
     pub fn set_automatic_chain_limit(&self, limit: u32) -> u32 {
         let mut runtime = self.runtime.lock();
-        let limit = limit.clamp(MIN_AUTOMATIC_CHAIN_LIMIT, MAX_AUTOMATIC_CHAIN_LIMIT);
+        let limit = limit.max(MIN_AUTOMATIC_CHAIN_LIMIT);
         runtime.automatic_chain_limit = limit;
         if let Err(error) = save_config(&runtime.paths.config, &runtime.config()) {
             runtime.log(&format!("无法保存连续自动继续上限：{error}"));
@@ -358,10 +355,9 @@ impl ContinuationService {
         automatic_chain_limit: u32,
         retry_message: String,
     ) -> Result<(), String> {
-        if !(MIN_AUTOMATIC_CHAIN_LIMIT..=MAX_AUTOMATIC_CHAIN_LIMIT).contains(&automatic_chain_limit)
-        {
+        if automatic_chain_limit < MIN_AUTOMATIC_CHAIN_LIMIT {
             return Err(format!(
-                "连续自动继续上限必须在 {MIN_AUTOMATIC_CHAIN_LIMIT} 到 {MAX_AUTOMATIC_CHAIN_LIMIT} 之间"
+                "连续自动继续上限必须至少为 {MIN_AUTOMATIC_CHAIN_LIMIT} 次"
             ));
         }
         let retry_message = retry_message.trim().to_string();
@@ -396,6 +392,17 @@ impl ContinuationService {
         }
         let mut runtime = self.runtime.lock();
         runtime.watcher.registry.dismiss(task_id)
+    }
+
+    pub fn reset_task_continuation_count(&self, task_id: &str) -> u32 {
+        let task_id = task_id.trim();
+        if task_id.is_empty() {
+            return 0;
+        }
+        let mut runtime = self.runtime.lock();
+        runtime.watcher.reset_chain(task_id);
+        runtime.persist_policy();
+        runtime.watcher.policy.chain_failures(task_id)
     }
 
     pub fn snapshot(&self) -> ContinuationSnapshot {

@@ -537,6 +537,11 @@ fn dismiss_task(task_id: String, state: State<'_, AppState>) -> bool {
 }
 
 #[tauri::command]
+fn reset_task_continuation_count(task_id: String, state: State<'_, AppState>) -> u32 {
+    state.service.reset_task_continuation_count(&task_id)
+}
+
+#[tauri::command]
 fn set_locale(
     locale: String,
     app: tauri::AppHandle,
@@ -651,6 +656,7 @@ pub fn run() {
             set_automatic_chain_limit,
             set_continuation_settings,
             dismiss_task,
+            reset_task_continuation_count,
             set_locale,
             open_codex_thread,
             open_log
@@ -725,9 +731,8 @@ mod tests {
         ContinuationSnapshot {
             running: true,
             auto_retry_enabled: true,
-            automatic_chain_limit: 10,
+            automatic_chain_limit: 50,
             automatic_chain_limit_min: 1,
-            automatic_chain_limit_max: 100,
             retry_message: "继续".into(),
             default_retry_message: "继续".into(),
             retry_message_max_chars: 1000,

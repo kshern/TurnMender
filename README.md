@@ -15,7 +15,7 @@ It does not require an OpenAI API key, upload task content, or interact with the
 > TurnMender is built with Tauri 2. Automatic continuation is available on macOS. Windows currently supports status monitoring only and does not send continuation messages.
 
 > [!IMPORTANT]
-> Each task automatically continues up to **10 consecutive times** by default. You can change this limit from 1 to 100 in **Settings**.
+> Each task automatically continues up to **50 consecutive times** by default. You can change this limit to any whole number of at least 1 in **Settings**.
 
 ## Download
 
@@ -29,7 +29,8 @@ Download the latest build from [GitHub Releases](https://github.com/kshern/TurnM
 - Sends the continuation message back to the original task by task ID instead of guessing from the active window or task title.
 - Shows the overall continuation status, recent tasks, task names, last activity times, and cases that require manual action.
 - Lets you pause or resume automatic continuation at any time while monitoring remains active.
-- Lets you set the consecutive automatic-continuation limit from 1 to 100 (10 by default).
+- Lets you set the consecutive automatic-continuation limit to any whole number of at least 1 (50 by default).
+- Provides a refresh icon beside each task's continuation count to clear that task's consecutive count.
 - Lets you customize the instruction sent to the original task and restore the default at any time.
 - Uses colored tray icons for healthy, attention, and action-required states.
 - Keeps running after the main window is closed; the tray menu shows status, toggles automatic continuation, opens tasks needing attention, provides Settings and log shortcuts, and can quit completely.
@@ -62,7 +63,7 @@ Additional safeguards prevent loops and accidental triggers:
 
 - Deduplication uses the task ID together with the failed turn ID.
 - A continuation counts as successful only after an acknowledgement containing a new turn ID is received.
-- When a task reaches the configured consecutive automatic-continuation limit, TurnMender switches to manual handling. The limit can be set from 1 to 100 in Settings and defaults to 10.
+- When a task reaches the configured consecutive automatic-continuation limit, TurnMender switches to manual handling. The limit can be set to any whole number of at least 1 in Settings and defaults to 50.
 - A manually sent message clears the consecutive count for that task.
 - At startup, TurnMender checks only records updated within the last 10 minutes and does not process much older failures.
 - If sending fails, it does not fall back to command-line or UI automation.

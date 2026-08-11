@@ -50,7 +50,6 @@ interface ContinuationSnapshot {
   auto_retry_enabled: boolean;
   automatic_chain_limit: number;
   automatic_chain_limit_min: number;
-  automatic_chain_limit_max: number;
   retry_message: string;
   default_retry_message: string;
   retry_message_max_chars: number;
@@ -113,6 +112,7 @@ const icons: Record<string, string> = {
     '<path d="M12 3 19 6v5c0 4.7-2.7 8-7 10-4.3-2-7-5.3-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/>',
   open: '<path d="M15 3h6v6M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   x: '<path d="m7 7 10 10M17 7 7 17"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0 1 4"/><path d="M20 5v6h-6"/>',
 };
 
 function icon(name: string, className = "icon"): string {
@@ -232,7 +232,6 @@ function settingsDialog(snapshot: ContinuationSnapshot): string {
   const messageLength = [...draft.retryMessage].length;
   const limitAria = escapeHTML(t("retry.limitAria", {
     min: snapshot.automatic_chain_limit_min,
-    max: snapshot.automatic_chain_limit_max,
   }));
   const error = state.settingsError
     ? `<div class="settings-error" role="alert">${escapeHTML(state.settingsError)}</div>`
@@ -254,10 +253,10 @@ function settingsDialog(snapshot: ContinuationSnapshot): string {
             <label class="setting-field" for="settings-chain-limit">
               <span>${t("settings.limitLabel")}</span>
               <span class="setting-inline-control">
-                <input id="settings-chain-limit" class="settings-number-input" type="number" min="${snapshot.automatic_chain_limit_min}" max="${snapshot.automatic_chain_limit_max}" step="1" inputmode="numeric" value="${escapeHTML(draft.automaticChainLimit)}" aria-label="${limitAria}" ${state.busy ? "disabled" : ""} />
+                <input id="settings-chain-limit" class="settings-number-input" type="number" min="${snapshot.automatic_chain_limit_min}" step="1" inputmode="numeric" value="${escapeHTML(draft.automaticChainLimit)}" aria-label="${limitAria}" ${state.busy ? "disabled" : ""} />
                 <span>${t("retry.limitUnit")}</span>
               </span>
-              <small>${t("settings.limitHint", { min: snapshot.automatic_chain_limit_min, max: snapshot.automatic_chain_limit_max })}</small>
+              <small>${t("settings.limitHint", { min: snapshot.automatic_chain_limit_min })}</small>
             </label>
 
             <label class="setting-field setting-message-field" for="settings-retry-message">
@@ -351,7 +350,10 @@ function render(): void {
                   <span class="task-subline-separator">·</span>
                   <span>${escapeHTML(formatTime(task.last_activity_at))}</span>
                   <span class="task-subline-separator">·</span>
-                  <span class="task-continuation-count ${task.continuation_count > 0 ? "active" : ""}" title="${escapeHTML(t("task.continuationCountTitle"))}">${escapeHTML(t("task.continuationCount", { count: task.continuation_count }))}</span>
+                  <span class="task-continuation-control">
+                    <span class="task-continuation-count ${task.continuation_count > 0 ? "active" : ""}" title="${escapeHTML(t("task.continuationCountTitle"))}">${escapeHTML(t("task.continuationCount", { count: task.continuation_count }))}</span>
+                    <button class="task-reset-continuation" type="button" data-task-id="${escapeHTML(task.task_id)}" aria-label="${escapeHTML(t("task.resetContinuationAria", { task: taskName }))}" title="${escapeHTML(t("task.resetContinuationAria", { task: taskName }))}" ${state.busy ? "disabled" : ""}>${icon("refresh")}</button>
+                  </span>
                 </div>
               </div>
               ${channelWarning}
@@ -552,6 +554,21 @@ function render(): void {
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>(".task-reset-continuation").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const taskId = button.dataset.taskId;
+      if (!taskId) return;
+      button.disabled = true;
+      try {
+        await invoke("reset_task_continuation_count", { taskId });
+        await loadSnapshot();
+      } catch (error) {
+        console.error(error);
+        button.disabled = false;
+      }
+    });
+  });
+
   document.querySelectorAll<HTMLButtonElement>(".task-open").forEach((button) => {
     button.addEventListener("click", async () => {
       const taskId = button.dataset.taskId;
@@ -618,12 +635,10 @@ async function saveSettings(snapshot: ContinuationSnapshot): Promise<void> {
   const automaticChainLimit = Number(draft.automaticChainLimit);
   if (
     !Number.isInteger(automaticChainLimit) ||
-    automaticChainLimit < snapshot.automatic_chain_limit_min ||
-    automaticChainLimit > snapshot.automatic_chain_limit_max
+    automaticChainLimit < snapshot.automatic_chain_limit_min
   ) {
     state.settingsError = t("settings.error.invalidLimit", {
       min: snapshot.automatic_chain_limit_min,
-      max: snapshot.automatic_chain_limit_max,
     });
     render();
     window.requestAnimationFrame(() => {

@@ -178,6 +178,14 @@ impl SessionWatcher {
         }
     }
 
+    pub fn reset_chain(&mut self, task_id: &str) {
+        if self.policy.chain_failures(task_id) == 0 {
+            return;
+        }
+        self.policy.reset_chain(task_id);
+        self.policy_dirty = true;
+    }
+
     pub fn policy_is_dirty(&self) -> bool {
         self.policy_dirty
     }

@@ -131,8 +131,12 @@ h2 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
 .task-project { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 180px; flex: 0 1 auto; color: #607188; font-weight: 600; }
 .task-project .icon { width: 12px; height: 12px; flex: 0 0 auto; }
 .task-project span { overflow: hidden; text-overflow: ellipsis; }
+.task-continuation-control { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; }
 .task-continuation-count { flex: 0 0 auto; }
 .task-continuation-count.active { color: #4b67c9; font-weight: 650; }
+.task-reset-continuation { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 auto; border: 0; border-radius: 5px; padding: 0; color: #a0acbb; background: transparent; opacity: .68; transition: color .16s ease, background .16s ease, opacity .16s ease; }
+.task-reset-continuation:hover:not(:disabled) { color: #4b67c9; background: #edf1ff; opacity: 1; }
+.task-reset-continuation .icon { width: 12px; height: 12px; }
 .task-channel { flex: 0 0 auto; max-width: 120px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .task-channel.tone-green { color: #2a926b; }
 .task-channel.tone-yellow { color: #b17718; }
@@ -166,7 +170,7 @@ h2 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
 .setting-row p { max-width: 390px; margin-top: 5px; }
 .setting-field { display: grid; gap: 7px; }
 .setting-inline-control { display: flex; align-items: center; gap: 7px; color: #7d8999; font-size: 11px; font-weight: 600; }
-.settings-number-input { width: 76px; height: 34px; border: 1px solid #d7dfeb; border-radius: 9px; padding: 0 8px; color: #2e4058; background: #f9fbfe; font-size: 12px; font-weight: 700; }
+.settings-number-input { width: 112px; height: 34px; border: 1px solid #d7dfeb; border-radius: 9px; padding: 0 8px; color: #2e4058; background: #f9fbfe; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 700; }
 .settings-number-input:hover, .settings-select-button:hover, .setting-message-field textarea:hover { border-color: #c2cee0; }
 .settings-number-input:focus, .settings-select-button:focus, .setting-message-field textarea:focus { border-color: #8da6f4; outline: 3px solid #e5ebff; }
 .setting-message-field textarea { width: 100%; min-height: 116px; resize: vertical; border: 1px solid #d7dfeb; border-radius: 11px; padding: 11px 12px; color: #2e4058; background: #fbfcff; font: 11px/1.55 ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace; transition: border-color .16s ease, box-shadow .16s ease; }

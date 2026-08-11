@@ -5,9 +5,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
-pub const DEFAULT_AUTOMATIC_CHAIN_LIMIT: u32 = 10;
+pub const DEFAULT_AUTOMATIC_CHAIN_LIMIT: u32 = 50;
 pub const MIN_AUTOMATIC_CHAIN_LIMIT: u32 = 1;
-pub const MAX_AUTOMATIC_CHAIN_LIMIT: u32 = 100;
 pub const MAX_RETRY_MESSAGE_CHARS: usize = 4_000;
 pub const DEFAULT_RETRY_MESSAGE: &str =
     "Continue the previous task. First inspect the current workspace and review the work already completed to avoid repeating any actions, then resume from where it was interrupted.";
@@ -57,9 +56,7 @@ impl Default for ContinuationConfig {
 
 impl ContinuationConfig {
     pub fn normalized(mut self) -> Self {
-        self.automatic_chain_limit = self
-            .automatic_chain_limit
-            .clamp(MIN_AUTOMATIC_CHAIN_LIMIT, MAX_AUTOMATIC_CHAIN_LIMIT);
+        self.automatic_chain_limit = self.automatic_chain_limit.max(MIN_AUTOMATIC_CHAIN_LIMIT);
         self.retry_message = normalize_retry_message(&self.retry_message);
         self
     }
@@ -267,7 +264,7 @@ mod tests {
         save_config(&path, &config).unwrap();
         let loaded = load_config(&path);
 
-        assert_eq!(loaded.automatic_chain_limit, MAX_AUTOMATIC_CHAIN_LIMIT);
+        assert_eq!(loaded.automatic_chain_limit, u32::MAX);
         assert_eq!(loaded.retry_message, "继续当前任务");
         fs::remove_file(path).unwrap();
     }
