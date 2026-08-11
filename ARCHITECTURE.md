@@ -1,6 +1,6 @@
 # TurnMender 架构说明
 
-TurnMender 是一个专为 Codex 桌面端设计的 Tauri 2 应用。前端负责展示和操作，Rust 后端负责读取 Codex 本地任务记录、判断是否需要继续、维护状态，并在 macOS 上通过本地消息通道发起下一轮。
+TurnMender 是一个专为 Codex 桌面端设计的 Tauri 2 应用。前端负责展示和操作，Rust 后端负责读取 Codex 本地任务记录、判断是否需要继续、维护状态，并在 macOS 或 Windows 上通过本地消息通道发起下一轮。
 
 ## 设计原则
 
@@ -25,7 +25,8 @@ src-tauri/src/
 │   └── state.rs            任务状态模型
 ├── watcher/mod.rs          增量读取和解析 JSONL 任务记录
 ├── transport/
-│   └── mac_desktop_ipc.rs  macOS 本地消息通道
+│   ├── mac_desktop_ipc.rs      macOS 本地消息通道
+│   └── windows_desktop_ipc.rs  Windows 本地消息通道
 ├── service.rs              后台轮询和整体处理流程
 ├── storage.rs              设置、状态和日志持久化
 └── lib.rs                  Tauri 命令、窗口和托盘生命周期
@@ -50,7 +51,7 @@ classifier 判断错误类型和 last_agent_message
             policy 去重与次数保护
                     │
                     ▼
-          macOS 本地消息通道发送
+         对应平台本地消息通道发送
                     │
         ┌───────────┴───────────┐
         ▼                       ▼
@@ -104,7 +105,7 @@ classifier 判断错误类型和 last_agent_message
 
 ### Windows
 
-当前共用任务监听、判断、状态和界面逻辑。Windows 通过 Codex 桌面的 `codex-ipc` 命名管道发送继续消息，并返回明确回执。
+后端连接 Codex 桌面端提供的 `\\.\pipe\codex-ipc` 命名管道。发送流程与 macOS 一样，先按任务 ID 查找持有该任务的桌面客户端，再请求启动新轮次；只有收到包含新轮次 ID 的成功回执，才认为发送完成。
 
 ## 本地数据
 

@@ -98,7 +98,7 @@ TurnMender 只在读取到完整的 `task_complete` 记录后作出判断，不�
 - pnpm 10
 - 对应平台的 Tauri 构建环境
 
-macOS 自动继续还需要 Codex 桌面端保持运行。
+自动继续需要 Codex 桌面端保持运行。
 
 ### 启动开发版
 
@@ -107,7 +107,7 @@ pnpm install
 pnpm tauri dev
 ```
 
-自动继续默认开启。启动开发版后，如果发现符合条件的新容量错误，macOS 上可能会真实发送继续消息。调试时请先确认主界面中的开关状态。
+自动继续默认开启。启动开发版后，如果发现符合条件的新容量错误，macOS 或 Windows 上可能会真实发送继续消息。调试时请先确认主界面中的开关状态。
 
 ### 检查与测试
 
@@ -146,6 +146,7 @@ Codex 任务目录优先取自 `CODEX_HOME`。未设置时使用 `~/.codex`：
 ```text
 任务记录：~/.codex/sessions
 macOS 消息通道：~/.codex/ipc/ipc.sock
+Windows 消息通道：\\.\pipe\codex-ipc
 ```
 
 如果设置了 `CODEX_HOME`，以上两个位置会相应变为 `$CODEX_HOME/sessions` 和 `$CODEX_HOME/ipc/ipc.sock`。

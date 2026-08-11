@@ -89,7 +89,7 @@ The tray menu explains the current state and includes a checked automatic-contin
 - pnpm 10
 - The Tauri build prerequisites for your platform
 
-Automatic continuation on macOS also requires Codex desktop to remain running.
+Automatic continuation requires Codex desktop to remain running.
 
 ### Run the development build
 
@@ -98,7 +98,7 @@ pnpm install
 pnpm tauri dev
 ```
 
-Automatic continuation is enabled by default. When a matching capacity error is found, the development build may send a real continuation message on macOS. Check the toggle in the main window before debugging.
+Automatic continuation is enabled by default. When a matching capacity error is found, the development build may send a real continuation message on macOS or Windows. Check the toggle in the main window before debugging.
 
 ### Checks and tests
 

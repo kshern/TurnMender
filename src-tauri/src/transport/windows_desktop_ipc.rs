@@ -147,10 +147,8 @@ impl Client {
         target: Option<&str>,
         timeout: Duration,
     ) -> Result<Value, SendError> {
-        self.stream
-            .set_read_timeout(Some(timeout));
-        self.stream
-            .set_write_timeout(Some(timeout));
+        self.stream.set_read_timeout(Some(timeout));
+        self.stream.set_write_timeout(Some(timeout));
         let request_id = Uuid::new_v4().to_string();
         let mut request = json!({
             "type":"request", "requestId":request_id, "sourceClientId":self.client_id,
@@ -199,17 +197,13 @@ impl Client {
 
     fn read_frame(&mut self) -> Result<Value, SendError> {
         let mut header = [0u8; 4];
-        self.stream
-            .read_exact(&mut header)
-            .map_err(map_io_error)?;
+        self.stream.read_exact(&mut header).map_err(map_io_error)?;
         let length = u32::from_le_bytes(header) as usize;
         if length == 0 || length > MAX_FRAME_SIZE {
             return Err(SendError::Protocol("返回消息大小异常".to_string()));
         }
         let mut payload = vec![0u8; length];
-        self.stream
-            .read_exact(&mut payload)
-            .map_err(map_io_error)?;
+        self.stream.read_exact(&mut payload).map_err(map_io_error)?;
         serde_json::from_slice(&payload).map_err(|error| SendError::Protocol(error.to_string()))
     }
 
