@@ -14,6 +14,9 @@ TurnMender 是专为 Codex 桌面端设计的本地续行工具。它会监听�
 
 > TurnMender 使用 Tauri 2。macOS 已实现自动继续；Windows 目前只支持状态监听，尚未开放自动发送。
 
+> [!IMPORTANT]
+> 每个任务默认最多连续自动继续 **10 次**。你可以在「设置」中自行修改次数上限（1–100 次）。
+
 ## 下载
 
 请前往 [GitHub Releases](https://github.com/kshern/TurnMender/releases/latest) 下载最新版本。当前 DMG 适用于 Apple Silicon Mac。

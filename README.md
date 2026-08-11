@@ -14,6 +14,9 @@ It does not require an OpenAI API key, upload task content, or interact with the
 
 > TurnMender is built with Tauri 2. Automatic continuation is available on macOS. Windows currently supports status monitoring only and does not send continuation messages.
 
+> [!IMPORTANT]
+> Each task automatically continues up to **10 consecutive times** by default. You can change this limit from 1 to 100 in **Settings**.
+
 ## Download
 
 Download the latest build from [GitHub Releases](https://github.com/kshern/TurnMender/releases/latest). The current DMG is built for Apple Silicon Macs.
