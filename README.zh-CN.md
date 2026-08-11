@@ -12,14 +12,14 @@ TurnMender 是专为 Codex 桌面端设计的本地续行工具。它会监听�
 
 它不需要 OpenAI API Key，不上传任务内容，也不会操作键盘、鼠标、剪贴板或窗口。TurnMender 是个人开发的非官方工具，与 OpenAI 没有关联。
 
-> TurnMender 使用 Tauri 2。macOS 已实现自动继续；Windows 目前只支持状态监听，尚未开放自动发送。
+> TurnMender 使用 Tauri 2。macOS 和 Windows 现在都可以通过 Codex 桌面的本地消息通道自动继续。
 
 > [!IMPORTANT]
 > 每个任务默认最多连续自动继续 **50 次**。你可以在「设置」中自行修改次数上限（至少 1 次）。
 
 ## 下载
 
-请前往 [GitHub Releases](https://github.com/kshern/TurnMender/releases/latest) 下载最新版本。当前 DMG 适用于 Apple Silicon Mac。
+请前往 [GitHub Releases](https://github.com/kshern/TurnMender/releases/latest) 下载最新版本。Windows 和 macOS 都会在发布页提供对应构建包。
 
 ## 主要功能
 
@@ -42,7 +42,7 @@ TurnMender 是专为 Codex 桌面端设计的本地续行工具。它会监听�
 | 平台 | 任务监听与界面 | 自动继续 | 当前说明 |
 | --- | --- | --- | --- |
 | macOS | 支持 | 支持 | 使用 Codex 桌面端的本地消息通道 |
-| Windows | 共用逻辑已实现，待实机验收 | 暂不支持 | 通道确认前只监听并提示人工继续 |
+| Windows | 支持 | 支持 | 使用 Codex 桌面端提供的 `codex-ipc` 命名管道 |
 | Linux / WSL2 | 未正式适配 | 暂不支持 | 不属于当前发布目标 |
 
 自动继续依赖 Codex 桌面端正在运行，并且本地消息通道可用。通道不存在、协议发生变化、找不到原任务或没有收到明确回执时，TurnMender 会停止自动处理该事件并提示人工继续。
@@ -199,8 +199,8 @@ TurnMender/
 
 - 依赖 Codex 当前的本地任务记录格式；格式变化后可能需要同步更新解析规则。
 - macOS 自动继续使用的是本地版本化通道，并非公开稳定接口；Codex 更新后可能暂时不可用。
-- Windows 尚未接入可以按任务 ID 定向发送并返回明确回执的本地通道。
 - 当前只处理模型容量不足，不会自动处理其他错误，也不会自动切换模型。
+- Windows 支持依赖 Codex 桌面端持续提供 `codex-ipc` 管道。
 - 启动时只补查最近 10 分钟的记录；更早的历史错误不会自动处理。
 - 当前项目仍处于持续开发和验证阶段。
 
