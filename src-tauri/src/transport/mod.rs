@@ -5,6 +5,8 @@ use thiserror::Error;
 
 #[cfg(target_os = "macos")]
 mod mac_desktop_ipc;
+#[cfg(target_os = "windows")]
+mod windows_desktop_ipc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendRequest {
@@ -24,7 +26,7 @@ pub struct SendReceipt {
 pub enum SendError {
     #[error("消息通道不可用")]
     Unavailable,
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     #[error("消息通道暂不支持当前平台")]
     Unsupported,
     #[error("任务不存在或没有持有者")]
@@ -45,16 +47,20 @@ pub fn make_sender() -> Arc<dyn Sender> {
     {
         Arc::new(mac_desktop_ipc::MacDesktopIpc::new())
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        Arc::new(windows_desktop_ipc::WindowsDesktopIpc::new())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Arc::new(UnsupportedSender)
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 struct UnsupportedSender;
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 impl Sender for UnsupportedSender {
     fn status(&self) -> ChannelStatus {
         ChannelStatus::Unsupported

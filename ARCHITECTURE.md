@@ -104,7 +104,7 @@ classifier 判断错误类型和 last_agent_message
 
 ### Windows
 
-当前共用任务监听、判断、状态和界面逻辑。由于尚未确认可靠的定向消息通道，Windows 不会自动发送，只提示用户人工继续。
+当前共用任务监听、判断、状态和界面逻辑。Windows 通过 Codex 桌面的 `codex-ipc` 命名管道发送继续消息，并返回明确回执。
 
 ## 本地数据
 

@@ -12,11 +12,11 @@ TurnMender is a local continuation helper built for Codex desktop. It watches th
 
 It does not require an OpenAI API key, upload task content, or interact with the keyboard, mouse, clipboard, or windows. TurnMender is an independent, unofficial personal project and is not affiliated with OpenAI.
 
-> TurnMender is built with Tauri 2. Automatic continuation is available on macOS. Windows currently supports status monitoring only and does not send continuation messages.
+> TurnMender is built with Tauri 2. Automatic continuation is available on both macOS and Windows through Codex desktop's local messaging channel.
 
 ## Download
 
-Download the latest build from [GitHub Releases](https://github.com/kshern/TurnMender/releases/latest). The current DMG is built for Apple Silicon Macs.
+Download the latest build from [GitHub Releases](https://github.com/kshern/TurnMender/releases/latest). Windows and macOS builds are published there together.
 
 ## Features
 
@@ -38,7 +38,7 @@ Download the latest build from [GitHub Releases](https://github.com/kshern/TurnM
 | Platform | Monitoring and UI | Automatic continuation | Current status |
 | --- | --- | --- | --- |
 | macOS | Supported | Supported | Uses the local messaging channel provided by Codex desktop |
-| Windows | Shared logic implemented; hardware validation pending | Not yet supported | Monitors and asks for manual continuation until a suitable channel is confirmed |
+| Windows | Supported | Supported | Uses the local `codex-ipc` named pipe provided by Codex desktop |
 | Linux / WSL2 | Not officially supported | Not supported | Outside the current release targets |
 
 Automatic continuation requires Codex desktop to be running and its local messaging channel to be available. If the channel is missing, the protocol changes, the original task cannot be found, or no explicit acknowledgement is received, TurnMender stops automatic handling for that event and asks for manual continuation.
@@ -133,6 +133,7 @@ The Codex task directory is resolved from `CODEX_HOME` when set, otherwise from 
 ```text
 Task records: ~/.codex/sessions
 macOS messaging channel: ~/.codex/ipc/ipc.sock
+Windows messaging channel: \\.\pipe\codex-ipc
 ```
 
 When `CODEX_HOME` is set, these paths become `$CODEX_HOME/sessions` and `$CODEX_HOME/ipc/ipc.sock`.
@@ -186,8 +187,8 @@ TurnMender/
 
 - TurnMender depends on the current Codex local task-record format. Parser updates may be required when that format changes.
 - Automatic continuation on macOS uses a local versioned channel rather than a public stable API. A Codex update may temporarily break compatibility.
-- Windows does not yet have a local channel that can target a task by ID and return an explicit acknowledgement.
 - Only model-capacity errors are handled. TurnMender does not process other errors or switch models automatically.
+- Windows support depends on the local `codex-ipc` pipe remaining available in Codex desktop.
 - Startup recovery checks only the most recent 10 minutes; older historical errors are not processed automatically.
 - The project remains under active development and validation.
 
