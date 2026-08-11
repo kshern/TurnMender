@@ -15,7 +15,7 @@ Selected model is at capacity
 Error running remote compact task: Selected model is at capacity
 ```
 
-遇到这类报错时，TurnMender 会确认当前轮次没有最终回复，然后在**原任务**中自动发送继续指令，让 Codex 接着完成未完成的工作。
+遇到这类报错时，TurnMender 会确认当前轮次没有最终回复，然后在**原任务**中自动继续。普通任务会收到继续指令；目标模式中的目标如果被报错暂停，则会自动恢复为运行状态。
 
 ## 下载
 
@@ -33,6 +33,7 @@ Error running remote compact task: Selected model is at capacity
 
 - 在本机监听 Codex 任务记录，只处理模型容量不足的报错。
 - 仅在失败轮次没有最终回复时继续，避免重复发送。
+- 目标模式因容量错误暂停时，自动恢复原目标；状态切换期间不会额外发送普通续行消息，也不会改动已阻塞、额度受限或已完成的目标。
 - 按任务 ID 回到原任务，并记录已处理事件，避免循环触发。
 - 不需要 OpenAI API Key，不上传任务内容，也不操作键盘、鼠标或剪贴板。
 

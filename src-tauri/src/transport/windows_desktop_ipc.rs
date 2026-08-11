@@ -1,4 +1,6 @@
-use super::{SendError, SendReceipt, SendRequest, Sender};
+use super::{
+    goal_from_response, GoalRecovery, GoalState, SendError, SendReceipt, SendRequest, Sender,
+};
 use crate::core::ChannelStatus;
 use named_pipe::PipeClient;
 use serde_json::{json, Value};
@@ -40,6 +42,12 @@ impl Sender for WindowsDesktopIpc {
         let mut client = Self::connect(DISCOVERY_TIMEOUT)?;
         let owner = client.discover_owner(&request.task_id)?;
         client.start_turn(&request.task_id, &owner, &request.message)
+    }
+
+    fn recover_goal(&self, task_id: &str) -> Result<GoalRecovery, SendError> {
+        let mut client = Self::connect(DISCOVERY_TIMEOUT)?;
+        let owner = client.discover_owner(task_id)?;
+        client.recover_goal(task_id, &owner)
     }
 }
 
@@ -137,6 +145,36 @@ impl Client {
             new_turn_id: turn_id.to_string(),
             protocol_version: 1,
         })
+    }
+
+    fn recover_goal(&mut self, task_id: &str, owner: &str) -> Result<GoalRecovery, SendError> {
+        let response = self.request(
+            "thread/goal/get",
+            2,
+            json!({"threadId":task_id}),
+            Some(owner),
+            REQUEST_TIMEOUT,
+        )?;
+        match goal_from_response(&response)? {
+            GoalState::Paused => {}
+            GoalState::NoGoal => return Ok(GoalRecovery::NoGoal),
+            GoalState::Active => return Ok(GoalRecovery::AlreadyActive),
+            GoalState::Other(status) => return Ok(GoalRecovery::NotRecoverable(status)),
+        }
+
+        let response = self.request(
+            "thread/goal/set",
+            2,
+            json!({"threadId":task_id, "status":"active"}),
+            Some(owner),
+            REQUEST_TIMEOUT,
+        )?;
+        match goal_from_response(&response)? {
+            GoalState::Active => Ok(GoalRecovery::Resumed),
+            state => Err(SendError::Protocol(format!(
+                "目标恢复后状态异常: {state:?}"
+            ))),
+        }
     }
 
     fn request(

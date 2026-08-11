@@ -25,6 +25,7 @@ type ContinuationStatusKind =
   | "manual_continue"
   | "continuing"
   | "continued"
+  | "goal_resumed"
   | "confirm_send"
   | "stopped";
 
@@ -219,6 +220,7 @@ function statusText(status: ContinuationStatus, automaticChainLimit: number): st
     manual_continue: "status.manualContinue",
     continuing: "status.continuing",
     continued: "status.continued",
+    goal_resumed: "status.goalResumed",
     confirm_send: "status.confirmSend",
     stopped: "status.stopped",
   };

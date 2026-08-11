@@ -3,7 +3,7 @@ use crate::storage::{
     append_log, load_config, load_policy, save_config, save_policy, ContinuationConfig, Paths,
     DEFAULT_RETRY_MESSAGE, MAX_RETRY_MESSAGE_CHARS, MIN_AUTOMATIC_CHAIN_LIMIT,
 };
-use crate::transport::{make_sender, SendRequest, Sender};
+use crate::transport::{make_sender, GoalRecovery, SendRequest, Sender};
 use crate::watcher::{default_session_root, FailureEvent, SessionWatcher};
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -27,6 +27,7 @@ pub enum ContinuationStatusKind {
     ManualContinue,
     Continuing,
     Continued,
+    GoalResumed,
     ConfirmSend,
     Stopped,
 }
@@ -198,6 +199,62 @@ impl Runtime {
                 event.key.task_id
             ));
             return;
+        }
+
+        match self.sender.recover_goal(&event.key.task_id) {
+            Ok(GoalRecovery::Resumed) => {
+                self.watcher.mark_sent(&event);
+                self.watcher.note_automatic_turn(
+                    &event.key.task_id,
+                    &format!("goal-recovery:{}", event.key.turn_id),
+                );
+                self.watcher
+                    .registry
+                    .sent(&event.key.task_id, &event.key.turn_id, now());
+                self.status = ContinuationStatus::new(ContinuationStatusKind::GoalResumed);
+                self.log(&format!(
+                    "任务 {} 的暂停目标已自动恢复：失败轮次 {}",
+                    event.key.task_id, event.key.turn_id
+                ));
+                return;
+            }
+            Ok(GoalRecovery::NotRecoverable(status)) => {
+                self.watcher.mark_manual(&event);
+                self.watcher.registry.unknown(
+                    &event.key.task_id,
+                    &event.key.turn_id,
+                    event.completed_at,
+                );
+                self.status = ContinuationStatus::new(ContinuationStatusKind::ManualContinue);
+                self.log(&format!(
+                    "任务 {} 的目标状态为 {}，未自动修改目标",
+                    event.key.task_id, status
+                ));
+                return;
+            }
+            Ok(GoalRecovery::NoGoal) => {}
+            Ok(GoalRecovery::AlreadyActive) => {
+                self.watcher.mark_sent(&event);
+                self.watcher.note_automatic_turn(
+                    &event.key.task_id,
+                    &format!("goal-recovery:{}", event.key.turn_id),
+                );
+                self.watcher
+                    .registry
+                    .sent(&event.key.task_id, &event.key.turn_id, now());
+                self.status = ContinuationStatus::new(ContinuationStatusKind::GoalResumed);
+                self.log(&format!(
+                    "任务 {} 的目标已经在运行中，按自动继续处理：失败轮次 {}",
+                    event.key.task_id, event.key.turn_id
+                ));
+                return;
+            }
+            Err(error) => {
+                self.log(&format!(
+                    "任务 {} 无法确认目标状态，改用普通续行：{error}",
+                    event.key.task_id
+                ));
+            }
         }
 
         self.status = ContinuationStatus::new(ContinuationStatusKind::Continuing);

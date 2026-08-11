@@ -15,7 +15,7 @@ Selected model is at capacity
 Error running remote compact task: Selected model is at capacity
 ```
 
-When either error occurs, TurnMender confirms that the failed turn has no final response, then automatically sends a continuation instruction to the **original task** so Codex can resume the unfinished work.
+When either error occurs, TurnMender confirms that the failed turn has no final response, then continues the **original task** automatically. Normal tasks receive a continuation instruction; if Goal mode was paused by the error, TurnMender resumes that goal instead.
 
 ## Download
 
@@ -33,6 +33,7 @@ TurnMender keeps running in the system tray after its main window is closed. In 
 
 - Watches local Codex task records and handles only model-capacity errors.
 - Continues only when the failed turn has no final response, preventing duplicate messages.
+- Resumes a Goal-mode goal paused by a capacity error without sending a duplicate normal continuation during the state transition, and without changing blocked, usage-limited, budget-limited, or completed goals.
 - Returns to the original task by task ID and remembers handled events to prevent loops.
 - Requires no OpenAI API key, uploads no task content, and does not control the keyboard, mouse, or clipboard.
 
