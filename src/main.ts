@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import brandLogoUrl from "../src-tauri/icons/128x128.png";
+import brandLogoUrl from "../assets/turnmender-logo.png";
 import { getLocale, setLocale, t, type Locale } from "./i18n";
 import "./styles.css";
 
